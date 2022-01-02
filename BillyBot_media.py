@@ -94,7 +94,7 @@ class Player:
 
     def toggle_loop(self):
         """Toggles loop"""
-        #self._loop = not self._loop
+        self._loop = not self._loop
         return self._loop
 
     def next(self):
