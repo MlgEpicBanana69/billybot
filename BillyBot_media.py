@@ -1,6 +1,73 @@
+import numpy as np
+import validators
+from youtube_dl import YoutubeDL
+
+from discord import FFmpegPCMAudio
+from discord import get
+
+import asyncio
 import random
-from discord.utils import get
-import BillyBot_utils as bb_utils
+
+class Media:
+    _name = None
+    _playable = None
+    _source = None
+
+    def __init__(self, name, playable, source):
+        self._name = name
+        self._playable = playable
+        self._source = source
+
+    def __str__(self):
+        return self._name
+
+    def __repr__(self):
+        return "Media<{0}>".format(self._name)
+
+    def __call__(self):
+        return self.get_playable()
+
+    def get_name(self):
+        return self._name
+
+    def get_playable(self):
+        return self._playable
+
+    def get_source(self):
+        return self._source
+
+async def get_media(source):
+    """Gets a link and returns its ffmpeg object to be used for streaming purposes"""
+    # Options that seem to work perfectly (?)
+    # ydl_options = {'format': 'bestaudio', 'noplaylist':'True'}
+    # ffmpeg_options = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5', 'options': '-vn'}
+    ydl_options = {'format': 'worseaudio/bestaudio',
+                   'noplaylist':'True',
+                   'youtube_include_dash_manifest': False}
+    ffmpeg_options = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
+                      'options': '-vn'}
+
+    # Some online audio source was given
+    if source is not None:
+        # That source is a youtube link
+        if validators.url(source) and source.startswith("https://www.youtube.com/watch?v="):
+            with YoutubeDL(ydl_options) as ydl:
+                info = ydl.extract_info(source, download=False)
+                url = info['formats'][0]['url']
+                return Media(info['title'], FFmpegPCMAudio(url, **ffmpeg_options), source)
+        # The source is a link to a file DEBUG
+        elif validators.url(source):
+            return Media('debug', FFmpegPCMAudio(source, **ffmpeg_options), source)
+        # Treat source as a youtube query
+        else:
+            pass
+    return None
+
+async def download_media(source):
+    """Downloads a media from file url on the web"""
+    # Options that seem to work perfectly (?)
+    # ffmpeg_options = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5', 'options': '-vn'}
+    raise NotImplementedError()
 
 # Need to improve on queue editing, design
 # add dynamic youtube search and lastly optimize streaming quality (somehow)
@@ -57,7 +124,7 @@ class Player:
         """Returns the name of the current song"""
         return self.get_queue()[0].get_name()
 
-    async def play(self, source:bb_utils.Media):
+    async def play(self, source:Media):
         """Adds a to the queue
 
             assumes source is valid"""

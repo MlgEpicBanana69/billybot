@@ -12,9 +12,9 @@ import cv2
 import numpy as np
 import validators
 
-import BillyBot_player as bb_pl
-import BillyBot_utils as bb_ut
-import BillyBot_minesweeper as bb_mi
+import BillyBot_utils as bb_utils
+import BillyBot_minesweeper as bb_minesweeper
+import BillyBot_media as bb_media
 
 # Ideas:
 #   osu statistics display
@@ -39,7 +39,7 @@ async def on_ready():
     """Does the initial setup for BillyBot"""
     # Generates and binds a player for all of the guilds
     for guild in BillyBot.guilds:
-        bb_pl.Player(guild, BillyBot)
+        bb_media.Player(guild, BillyBot)
     await BillyBot.change_presence(status=discord.Status.online, activity=discord.Game("Pogging rn use ~ for stuff"))
     print("Logged on as {0}!".format(BillyBot.user))
 
@@ -56,7 +56,7 @@ async def on_message(message):
 
 @BillyBot.event
 async def on_guild_join(guild):
-    bb_pl.Player(guild, BillyBot)
+    bb_media.Player(guild, BillyBot)
 
 @BillyBot.command(aliases=["Mute", "mutee", "mut", "Mutee", "Mut"])
 @commands.has_permissions(mute_members=True)
@@ -82,7 +82,7 @@ async def unmute(ctx, member : discord.Member):
 async def getsource(ctx, source):
     """May or may not be illegal. Lawsuit may be pending..."""
 
-    media = await bb_ut.download_media(source)
+    media = await bb_utils.download_media(source)
     await ctx.channel.send(media)
 
 @BillyBot.command(aliases=["Play", "pla", "Pla", "p", "P"])
@@ -90,8 +90,8 @@ async def play(ctx, *, source=None):
     """Plays audio from an audio source"""
 
     # Builds the player incase the server aint got one
-    if bb_pl.Player.get_player(ctx.guild) is None:
-        bb_pl.Player(ctx.guild, BillyBot)
+    if bb_media.Player.get_player(ctx.guild) is None:
+        bb_media.Player(ctx.guild, BillyBot)
     await join(ctx)
 
     # Playing a 'source' goes by a these rules:
@@ -103,14 +103,14 @@ async def play(ctx, *, source=None):
     # also when multiple sources are given, BillyBot takes only the first one
     # further attachments are *completely* ignored.
 
-    guild_player = bb_pl.Player.get_player(ctx.guild)
+    guild_player = bb_media.Player.get_player(ctx.guild)
     if len(ctx.message.attachments) > 0:
         attachment = ctx.message.attachments[0]
         await join(ctx)
         await guild_player.play(attachment.url)
         return
     elif validators.url(source):
-        media = await bb_ut.get_media(source)
+        media = await bb_utils.get_media(source)
         if media is not None:
             await guild_player.play(media)
         else:
@@ -122,60 +122,46 @@ async def play(ctx, *, source=None):
     else:
         ctx.message.channel.send("what")
 
-   # Some online audio source was given
-   # if source is not None:
-   #     # That source is a youtube link
-   #     if validators.url(source) and source.startswith("https://www.youtube.com/watch?v="):
-   #         await join(ctx)
-   #         await bb_pl.Player.get_player(ctx.guild).play(source, source)
-   #     # That source is a url to an audio file
-   #     elif validators.url(source):
-   #         await join(ctx)
-   #         await bb_pl.Player.get_player(ctx.guild).play(url, source)
-   #     # Treat the source as a youtube video query and pull the first 10 results
-   #     else:
-   #         pass
-
 @BillyBot.command(aliases=["Stop", "Stoop", "stoop", "Sto", "sto", "stopp", "Stopp", "Clear", "clear"])
 async def stop(ctx):
     """Stops the music and clears the queue"""
-    await bb_pl.Player.get_player(ctx.guild).stop()
+    await bb_media.Player.get_player(ctx.guild).stop()
 
 @BillyBot.command(aliases=["Pause"])
 async def pause(ctx):
     """Pauses the current song"""
     if ctx.guild.me.voice.channel == ctx.author.voice.channel and ctx.guild.me.voice is not None:
         await ctx.channel.send("Now paused.")
-        await bb_pl.Player.get_player(ctx.guild).pause()
+        await bb_media.Player.get_player(ctx.guild).pause()
 
 @BillyBot.command(aliases=["Resume"])
 async def resume(ctx):
     """Pauses the current song"""
     if ctx.guild.me.voice.channel == ctx.author.voice.channel and ctx.guild.me.voice is not None:
         await ctx.channel.send("Resumed.")
-        await bb_pl.Player.get_player(ctx.guild).resume()
+        await bb_media.Player.get_player(ctx.guild).resume()
 
 @BillyBot.command(aliases=["Next", "next", "skip", "Skip"])
 async def next_song(ctx):
     """Skips to the next song in queue"""
-    bb_pl.Player.get_player(ctx.guild).next()
+    bb_media.Player.get_player(ctx.guild).next()
 
 @BillyBot.command(aliases=["Shuffle"])
 async def shuffle(ctx):
     """Shuffles the queue"""
-    bb_pl.Player.get_player(ctx.guild).shuffle()
+    bb_media.Player.get_player(ctx.guild).shuffle()
 
 @BillyBot.command(aliases=["Loop", "loop"])
 async def toggle_loop(ctx):
     """Toggles playlist loop on/off"""
-    loop_state = bb_pl.Player.get_player(ctx.guild).toggle_loop()
+    loop_state = bb_media.Player.get_player(ctx.guild).toggle_loop()
     loop_state = "ON" if loop_state else "OFF"
     await ctx.channel.send("Loop state is now {0}".format(loop_state))
 
 @BillyBot.command(aliases=["Goto", "GoTo"])
 async def goto(ctx, position : int):
     """Skips to a position in queue"""
-    await bb_pl.Player.get_player(ctx.guild).goto(position)
+    await bb_media.Player.get_player(ctx.guild).goto(position)
 
 @BillyBot.command(aliases=["Ban"])
 @commands.has_permissions(administrator=True)
@@ -186,7 +172,7 @@ async def ban(ctx, member:discord.User, reason=""):
 @BillyBot.command(aliases=["current"])
 async def current_song(ctx):
     """Shows the current song that is playing"""
-    guild_player = bb_pl.Player.get_player(ctx.guild)
+    guild_player = bb_media.Player.get_player(ctx.guild)
     if len(guild_player.get_sourcenames()) > 0:
         await ctx.channel.send("Currently playing {0} at position: {1}".format(guild_player.current_song()[0], guild_player.current_song()[1]))
     else:
@@ -195,7 +181,7 @@ async def current_song(ctx):
 @BillyBot.command(aliases=["Queue", "queue", "q", "Q"])
 async def song_queue(ctx):
     """Displays the current queue"""
-    guild_player = bb_pl.Player.get_player(ctx.guild)
+    guild_player = bb_media.Player.get_player(ctx.guild)
     queue_string = "\n".join([media.get_name() for media in guild_player.get_queue()])
     if queue_string != "":
         await ctx.channel.send(queue_string)
@@ -226,7 +212,7 @@ async def leave(ctx):
         await ctx.channel.send("What")
     if ctx.guild.voice_client is not None:
         await ctx.guild.voice_client.disconnect()
-        bb_pl.Player.get_player(ctx.guild).wipe()
+        bb_media.Player.get_player(ctx.guild).wipe()
     else:
         await ctx.message.channel.send("I'm not in a voice channel! Use {0}join to make me join one.".format(BillyBot.command_prefix))
 
@@ -336,7 +322,7 @@ async def cyber(ctx, *args):
                     elif (foreground_image[row, col][3] == 0):
                         pass
                     else:
-                        current_img[row + row_offset, col + col_offset] = bb_ut.merge_pixels(foreground_image[row, col], current_img[row + row_offset, col + col_offset])
+                        current_img[row + row_offset, col + col_offset] = bb_utils.merge_pixels(foreground_image[row, col], current_img[row + row_offset, col + col_offset])
                 except IndexError:
                     pass
         await ctx.channel.send(content="", file=discord.File(fp=io.BytesIO(cv2.imencode(".png", current_img)[1].tobytes()), filename="outputImage.png"))
@@ -344,8 +330,8 @@ async def cyber(ctx, *args):
 @BillyBot.command(aliases=["Bibi", "BiBi", "BB", "Bb", "bb"])
 async def bibi(ctx):
     """Sends a picture of Israel's **EX** prime minister Benjamin Netanyahu."""
-    bb_images = os.listdir("resources\\bibi")
-    with open("resources\\bibi" + random.choice(bb_images), "rb") as bb_pick:
+    bb_images = os.listdir("resources\\bibi\\")
+    with open("resources\\bibi\\" + random.choice(bb_images), "rb") as bb_pick:
         await ctx.message.channel.send(file=discord.File(fp=bb_pick, filename="bb.png"))
 
 @BillyBot.command(aliases=["Echo", "echo", "Say"])
@@ -416,7 +402,7 @@ async def minesweeper(ctx, width, height, mines):
         await ctx.channel.send("Invalid paramenters!")
         return
 
-    minesweeper_game = bb_mi.Minesweeper(width, height, mines)
+    minesweeper_game = bb_minesweeper.Minesweeper(width, height, mines)
     minesweeper_game.generate()
     minesweeper_message = str(minesweeper_game)
 
