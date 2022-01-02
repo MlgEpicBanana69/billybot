@@ -21,6 +21,7 @@ import BillyBot_minesweeper as bb_mi
 #   ghost ping logging
 #   server managment commands
 #   the ultimate shitpost database
+#   Trade with TamaCrypto (Based!!)
 
 # https://discord.com/api/oauth2/authorize?client_id=757490339425550336&permissions=8&scope=bot
 
@@ -343,8 +344,8 @@ async def cyber(ctx, *args):
 @BillyBot.command(aliases=["Bibi", "BiBi", "BB", "Bb", "bb"])
 async def bibi(ctx):
     """Sends a picture of Israel's **EX** prime minister Benjamin Netanyahu."""
-    bb_images = os.listdir("C:\\Users\\MlgEp\\Google Drive\\HOME\\Python\\Projects\\Self\\anime_cyber\\Discord bot\\bibi")
-    with open("C:\\Users\\MlgEp\\Google Drive\\HOME\\Python\\Projects\\Self\\anime_cyber\\Discord bot\\bibi\\" + random.choice(bb_images), "rb") as bb_pick:
+    bb_images = os.listdir("resources\\bibi")
+    with open("resources\\bibi" + random.choice(bb_images), "rb") as bb_pick:
         await ctx.message.channel.send(file=discord.File(fp=bb_pick, filename="bb.png"))
 
 @BillyBot.command(aliases=["Echo", "echo", "Say"])
