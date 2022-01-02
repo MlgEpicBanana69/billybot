@@ -2,8 +2,8 @@ import numpy as np
 import validators
 from youtube_dl import YoutubeDL
 
-from discord import FFmpegPCMAudio
-from discord import get
+import discord
+from discord.utils import get
 
 import asyncio
 import random
@@ -13,10 +13,9 @@ class Media:
     _playable = None
     _source = None
 
-    def __init__(self, name, playable, source):
-        self._name = name
-        self._playable = playable
+    def __init__(self, source):
         self._source = source
+        self.generate_streamables()
 
     def __str__(self):
         return self._name
@@ -36,38 +35,37 @@ class Media:
     def get_source(self):
         return self._source
 
-async def get_media(source):
-    """Gets a link and returns its ffmpeg object to be used for streaming purposes"""
-    # Options that seem to work perfectly (?)
-    # ydl_options = {'format': 'bestaudio', 'noplaylist':'True'}
-    # ffmpeg_options = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5', 'options': '-vn'}
-    ydl_options = {'format': 'worseaudio/bestaudio',
-                   'noplaylist':'True',
-                   'youtube_include_dash_manifest': False}
-    ffmpeg_options = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
-                      'options': '-vn'}
+    def generate_streamables(self):
+        """Generates the streamables attributes for the current Media object.
+           sets self._name and self._playable. This function returns nothing"""
 
-    # Some online audio source was given
-    if source is not None:
+        # Options that seem to work perfectly (?)
+        # ydl_options = {'format': 'bestaudio', 'noplaylist':'True'}
+        # ffmpeg_options = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5', 'options': '-vn'}
+        ydl_options = {'format': 'worseaudio/bestaudio',
+                    'noplaylist':'True',
+                    'youtube_include_dash_manifest': False}
+        ffmpeg_options = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
+                        'options': '-vn'}
+
         # That source is a youtube link
-        if validators.url(source) and source.startswith("https://www.youtube.com/watch?v="):
+        if validators.url(self._source) and self._source.startswith("https://www.youtube.com/watch?v="):
             with YoutubeDL(ydl_options) as ydl:
-                info = ydl.extract_info(source, download=False)
+                info = ydl.extract_info(self._source, download=False)
                 url = info['formats'][0]['url']
-                return Media(info['title'], FFmpegPCMAudio(url, **ffmpeg_options), source)
-        # The source is a link to a file DEBUG
-        elif validators.url(source):
-            return Media('debug', FFmpegPCMAudio(source, **ffmpeg_options), source)
+
+                self._name = info['title']
+                self._playable = discord.FFmpegPCMAudio(url, **ffmpeg_options)
+
+        # The source is a link to a file TODO: Implement properly
+        elif validators.url(self._source):
+            self._name = "bruh??"
+            self._playable = discord.FFmpegPCMAudio(self._source, **ffmpeg_options)
+
+
         # Treat source as a youtube query
         else:
-            pass
-    return None
-
-async def download_media(source):
-    """Downloads a media from file url on the web"""
-    # Options that seem to work perfectly (?)
-    # ffmpeg_options = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5', 'options': '-vn'}
-    raise NotImplementedError()
+            return None
 
 # Need to improve on queue editing, design
 # add dynamic youtube search and lastly optimize streaming quality (somehow)
@@ -82,17 +80,13 @@ class Player:
     _queue = None    # The queue of songs in order
 
     def __init__(self, guild, bot):
-        if self not in self._players:
-            self._players.append(self)
+        self._players.append(self)
 
-            self._guild = guild
-            self._bot = bot
-            self._loop = False
-            self._queue = []
-        else:
-            # I need to know when a player gets duped
-            del self
-            raise Exception()
+        self._guild = guild
+        self._bot = bot
+
+        self._loop = False
+        self._queue = []
 
     def shuffle(self):
         """Shuffles the queue"""
@@ -166,7 +160,9 @@ class Player:
         return self._queue
 
     def wipe(self):
-        """Wipes the player back into default settings"""
+        """Stops playing and wipes the player back into default settings"""
+        self.stop()
+
         self._loop = False
         self._queue = []
 

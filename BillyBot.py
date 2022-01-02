@@ -87,12 +87,7 @@ async def getsource(ctx, source):
 
 @BillyBot.command(aliases=["Play", "pla", "Pla", "p", "P"])
 async def play(ctx, *, source=None):
-    """Plays audio from an audio source"""
-
-    # Builds the player incase the server aint got one
-    if bb_media.Player.get_player(ctx.guild) is None:
-        bb_media.Player(ctx.guild, BillyBot)
-    await join(ctx)
+    """Plays audio from an audio source
 
     # Playing a 'source' goes by a these rules:
     # 1) An audio file is embeded, play that audio file
@@ -101,24 +96,23 @@ async def play(ctx, *, source=None):
 
     # Few key notes, a source cannot be theoretically invalid
     # also when multiple sources are given, BillyBot takes only the first one
-    # further attachments are *completely* ignored.
+    # further attachments are *completely* ignored."""
 
+    await join(ctx)
     guild_player = bb_media.Player.get_player(ctx.guild)
+
     if len(ctx.message.attachments) > 0:
         attachment = ctx.message.attachments[0]
-        await join(ctx)
-        await guild_player.play(attachment.url)
-        return
+        media = bb_media.Media(attachment.url)
+        await guild_player.play(media)
+
     elif validators.url(source):
-        media = await bb_utils.get_media(source)
-        if media is not None:
-            await guild_player.play(media)
-        else:
-            # debug
-            # might want to give feedback on why
-            pass
+        media = bb_media.Media(source)
+        await guild_player.play(media)
+
     elif source is not None:
         raise NotImplementedError()
+
     else:
         ctx.message.channel.send("what")
 
