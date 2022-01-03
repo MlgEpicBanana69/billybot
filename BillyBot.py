@@ -3,7 +3,6 @@
 import io
 import os
 import random
-from token import COMMA
 
 import aiohttp
 import discord
