@@ -1,16 +1,23 @@
-import numpy as np
+import random
+import requests
+import mimetypes
+mimetypes.init()
+
 import validators
 from youtube_dl import YoutubeDL
-
 import discord
 from discord.utils import get
-
-import random
 
 class Media:
     _name = None
     _content = None
     _source = None
+    _route_type = None
+
+    def __init__(self, source):
+        self._source = source
+        self.source_route()
+        assert self._route_type is not None
 
     def __str__(self):
         return self._name
@@ -18,30 +25,71 @@ class Media:
     def __repr__(self):
         return "Media<{0}>".format(self._name)
 
-    
+    def __call__(self):
+        return self.get_content()
 
     def get_name(self):
         return self._name
 
     def get_content(self):
-        if self._content is None:
-            self.generate_streamables()
-
-        temp = self._content
-        self._content = None
-        return temp
+       return self._content
 
     def get_source(self):
         return self._source
 
-    
+    @staticmethod
+    def query_youtube(q):
+        """Query youtube using a query and returns a list of the """
+        raise NotImplementedError()
+
+    def source_route(self):
+        """Sets the Media's _route_type variable"""
+
+        route = None
+        if validators.url(self._source):
+            if self._source.startswith("https://www.youtube.com/watch?v="):
+                route = "youtube_media"
+            elif '.' in self._source and '/' in self._source:
+                mimestart = mimetypes.guess_type(self._source.split('/')[-1])[0]
+                if mimestart is not None:
+                    if mimestart.split('/')[0] in ['video', 'audio', 'image']:
+                        route = "generic_" + mimestart.split('/')[0]
+        self._route_type = route
+
+    def fetch_file(self, url):
+        # 100MB
+        size_limit = 104857600
+
+        # The url is to a file
+        if self.source_route(url) == "generic_streamable_media":
+            resp = requests.get(self._source, stream=True)
+            resp.raise_for_status()
+
+            if len(resp.content) > size_limit:
+                raise ValueError('respose too large')
+
+            contents = bytes()
+            # 8MB
+            curr_size = 0
+            for chunk in resp.iter_content(size_limit):
+                curr_size += len(chunk)
+                if curr_size > size_limit:
+                    raise ValueError("response too large")
+                contents += chunk
+            return contents
 
 class Streamable(Media):
     def __init__(self, source):
-        self._source = source
+        super().__init__(source)
+        self.generate_content()
 
-    def __call__(self):
-        return self.get_content()
+    def get_content(self):
+        if self._content is None:
+            self.generate_content()
+        # Streamable content is one time use and is desposed of
+        temp = self._content
+        self._content = None
+        return temp
 
     def generate_content(self, no_video=True):
         """Generates the streamables attributes for a Streamable object.
@@ -57,7 +105,7 @@ class Streamable(Media):
                         'options': '-vn'}
 
         # That source is a youtube link
-        if validators.url(self._source) and self._source.startswith("https://www.youtube.com/watch?v="):
+        if self._route_type == "youtube_media":
             with YoutubeDL(ydl_options) as ydl:
                 info = ydl.extract_info(self._source, download=False)
                 url = info['formats'][0]['url']
@@ -67,22 +115,25 @@ class Streamable(Media):
                     self._content = discord.FFmpegPCMAudio(url, **ffmpeg_options)
 
         # The source is a link to a file TODO: Implement properly
-        elif validators.url(self._source):
-            self._name = "bruh??"
+        elif self._route_type in ["generic_video", "generic_audio"]:
+            self._name = self._source.split('/')[-1]
             if no_video:
                 self._content = discord.FFmpegPCMAudio(self._source, **ffmpeg_options)
 
+class Static(Media):
+    def __init__(self, source):
+        super().__init__(source)
+        self.generate_content()
 
-        # Treat source as a youtube query
-        else:
-            return None
+    def get_content(self):
+        return self._content
 
-class Image(Media):
-    pass
-
+    def generate_content(self):
+        if self.source_route() != "youtube_media":
+            self._content = self.fetch_file(self._source)
 
 # Need to improve on queue editing, design
-# add dynamic youtube search and lastly optimize streaming quality (somehow)
+# add youtube query
 class Player:
     """BillyBot's unique player"""
 
@@ -108,7 +159,6 @@ class Player:
             temp = self._queue.pop(0)
             random.shuffle(self._queue)
             self._queue.insert(0, temp)
-
 
     def toggle_loop(self):
         """Toggles loop"""
@@ -138,13 +188,12 @@ class Player:
         """Returns the name of the current song"""
         return self.get_queue()[0].get_name()
 
-    async def play(self, media:Media):
+    async def play(self, media:Streamable):
         """Adds a Media object to the queue"""
 
         voice = get(self._bot.voice_clients, guild=self._guild)
-        #while voice.is_playing() and len(self._queue) == 0:
-        #    pass
 
+        assert media is not None
         # Adds to queue if media is not None
         self._queue.append(media)
 
@@ -160,7 +209,7 @@ class Player:
             get(self._bot.voice_clients, guild=self._guild).stop()
 
     async def pause(self):
-        """Pauses playing the queue"""
+        """Pauses play"""
         get(self._bot.voice_clients, guild=self._guild).pause()
 
     async def resume(self):

@@ -36,6 +36,7 @@ auto_say_members = []
 @BillyBot.event
 async def on_ready():
     """Does the initial setup for BillyBot"""
+
     # Generates and binds a player for all of the guilds
     for guild in BillyBot.guilds:
         bb_media.Player(guild, BillyBot)
@@ -77,13 +78,6 @@ async def unmute(ctx, member : discord.Member):
     else:
         await member.edit(mute=False)
 
-@BillyBot.command()
-async def getsource(ctx, source):
-    """May or may not be illegal. Lawsuit may be pending..."""
-
-    media = await bb_utils.download_media(source)
-    await ctx.channel.send(media)
-
 @BillyBot.command(aliases=["Play", "pla", "Pla", "p", "P"])
 async def play(ctx, *, source=None):
     """Plays audio from an audio source
@@ -93,27 +87,27 @@ async def play(ctx, *, source=None):
     # 2) A link is requested, depending on where that link leads, fetch the audio file and play it
     # 3) A query is requested, search that query on youtube and recommand multiple best results
 
-    # Few key notes, a source cannot be theoretically invalid
     # also when multiple sources are given, BillyBot takes only the first one
     # further attachments are *completely* ignored."""
+    voice = get(BillyBot.voice_clients, guild=ctx.guild)
+    client_voice = ctx.author.voice
+    if client_voice is not None:
+        await join(ctx)
+        guild_player = bb_media.Player.get_player(ctx.guild)
 
-    await join(ctx)
-    guild_player = bb_media.Player.get_player(ctx.guild)
+        if len(ctx.message.attachments) > 0:
+            attachment = ctx.message.attachments[0]
+            media = bb_media.Streamable(attachment.url)
+            await guild_player.play(media)
 
-    if len(ctx.message.attachments) > 0:
-        attachment = ctx.message.attachments[0]
-        media = bb_media.Media(attachment.url)
-        await guild_player.play(media)
+        elif validators.url(source):
+            media = bb_media.Streamable(source)
+            await guild_player.play(media)
 
-    elif validators.url(source):
-        media = bb_media.Media(source)
-        await guild_player.play(media)
-
-    elif source is not None:
-        raise NotImplementedError()
-
+        elif source is not None:
+            raise NotImplementedError()
     else:
-        ctx.message.channel.send("what")
+        ctx.channel.send("You're not in any voice channel.")
 
 @BillyBot.command(aliases=["Stop", "Stoop", "stoop", "Sto", "sto", "stopp", "Stopp", "Clear", "clear"])
 async def stop(ctx):
@@ -156,12 +150,6 @@ async def goto(ctx, position : int):
     """Skips to a position in queue"""
     await bb_media.Player.get_player(ctx.guild).goto(position)
 
-@BillyBot.command(aliases=["Ban"])
-@commands.has_permissions(administrator=True)
-async def ban(ctx, member:discord.User, reason=""):
-    await ctx.guild.ban(member, reason=reason)
-    ctx.channel.send(f"{member} got fucked")
-
 @BillyBot.command(aliases=["current"])
 async def current_song(ctx):
     """Shows the current song that is playing"""
@@ -189,10 +177,8 @@ async def join(ctx):
         return
     elif ctx.guild.voice_client is None:
         await ctx.author.voice.channel.connect()
-        get(BillyBot.voice_clients, guild=ctx.guild).stop()
     elif ctx.guild.voice_client.channel != ctx.author.voice.channel:
         await ctx.guild.me.move_to(ctx.author.voice.channel)
-
     try:
         await ctx.guild.me.edit(deafen=True)
     except discord.errors.Forbidden:
@@ -335,7 +321,7 @@ async def say(ctx, *, message):
 @BillyBot.command(aliases=["SayToggle", "Saytoggle", "echotoggle", "echome",
                         "copycat", "Copycat", "Echome", "EchoMe", "CopyCat",
                         "EchoToggle", "Echotoggle"])
-async def saytoogle(ctx):
+async def saytoggle(ctx):
     """Toggles on/off the auto echo function."""
 
     if (ctx.author.id, ctx.guild.id) not in auto_say_members:
