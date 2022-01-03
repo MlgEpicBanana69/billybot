@@ -5,17 +5,12 @@ from youtube_dl import YoutubeDL
 import discord
 from discord.utils import get
 
-import asyncio
 import random
 
 class Media:
     _name = None
-    _playable = None
+    _content = None
     _source = None
-
-    def __init__(self, source):
-        self._source = source
-        self.generate_streamables()
 
     def __str__(self):
         return self._name
@@ -23,26 +18,34 @@ class Media:
     def __repr__(self):
         return "Media<{0}>".format(self._name)
 
-    def __call__(self):
-        return self.get_playable()
+    
 
     def get_name(self):
         return self._name
 
-    def get_playable(self):
-        if self._playable is None:
+    def get_content(self):
+        if self._content is None:
             self.generate_streamables()
 
-        temp = self._playable
-        self._playable = None
+        temp = self._content
+        self._content = None
         return temp
 
     def get_source(self):
         return self._source
 
-    def generate_streamables(self, no_video=True):
-        """Generates the streamables attributes for the current Media object.
-           sets self._name and self._playable. This function returns nothing"""
+    
+
+class Streamable(Media):
+    def __init__(self, source):
+        self._source = source
+
+    def __call__(self):
+        return self.get_content()
+
+    def generate_content(self, no_video=True):
+        """Generates the streamables attributes for a Streamable object.
+           sets self._name and self._content. This function returns nothing"""
 
         # Options that seem to work perfectly (?)
         # ydl_options = {'format': 'bestaudio', 'noplaylist':'True'}
@@ -61,18 +64,22 @@ class Media:
 
                 self._name = info['title']
                 if no_video:
-                    self._playable = discord.FFmpegPCMAudio(url, **ffmpeg_options)
+                    self._content = discord.FFmpegPCMAudio(url, **ffmpeg_options)
 
         # The source is a link to a file TODO: Implement properly
         elif validators.url(self._source):
             self._name = "bruh??"
             if no_video:
-                self._playable = discord.FFmpegPCMAudio(self._source, **ffmpeg_options)
+                self._content = discord.FFmpegPCMAudio(self._source, **ffmpeg_options)
 
 
         # Treat source as a youtube query
         else:
             return None
+
+class Image(Media):
+    pass
+
 
 # Need to improve on queue editing, design
 # add dynamic youtube search and lastly optimize streaming quality (somehow)
