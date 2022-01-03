@@ -21,7 +21,7 @@ import BillyBot_media as bb_media
 #   ghost ping logging
 #   server managment commands
 #   the ultimate shitpost database
-#   Trade with TamaCrypto (Based!!)3
+#   Trade with TamaCrypto (Based!!)
 
 # https://discord.com/api/oauth2/authorize?client_id=757490339425550336&permissions=8&scope=bot
 
@@ -31,7 +31,6 @@ BillyBot = commands.Bot(command_prefix='~', intents=intents)
 
 # Every auto list contains a two dimension tuple containing the member id and guild id
 # (id, guild_id)
-auto_cyber_members = []
 auto_say_members = []
 
 @BillyBot.event
@@ -333,29 +332,18 @@ async def say(ctx, *, message):
     """Repeats a given message."""
     await ctx.channel.send(message)
 
-@BillyBot.command(aliases=["SayState", "Saystate", "EchoState", "echostate", "Echostate"])
-async def saystate(ctx, state):
+@BillyBot.command(aliases=["SayToggle", "Saytoggle", "echotoggle", "echome",
+                        "copycat", "Copycat", "Echome", "EchoMe", "CopyCat",
+                        "EchoToggle", "Echotoggle"])
+async def saytoogle(ctx):
     """Toggles on/off the auto echo function."""
-    if state == "on":
-        if (ctx.author.id, ctx.guild.id) not in auto_say_members:
-            auto_say_members.append((ctx.author.id, ctx.guild.id))
-    elif state == "off":
-        if (ctx.author.id, ctx.guild.id) in auto_say_members:
-            auto_say_members.remove((ctx.author.id, ctx.guild.id))
-    else:
-        return
-    await ctx.message.add_reaction("✅")
 
-@saystate.error
-async def saystate_error(ctx, error):
-    """Handles saystate function errors"""
-    if isinstance(error, discord.ext.commands.errors.MissingRequiredArgument):
-        response = ""
-        if (ctx.author.id, ctx.guild.id) in auto_say_members:
-            response = "on"
-        else:
-            response = "off"
-        await ctx.channel.send("Say state is {0}".format(response))
+    if (ctx.author.id, ctx.guild.id) not in auto_say_members:
+        auto_say_members.append((ctx.author.id, ctx.guild.id))
+    else:
+        auto_say_members.remove((ctx.author.id, ctx.guild.id))
+
+    await ctx.message.add_reaction("✅")
 
 @BillyBot.command(aliases=["Roll"])
 async def roll(ctx, start : int, end : int):

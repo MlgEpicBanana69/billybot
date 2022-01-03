@@ -40,7 +40,7 @@ class Media:
     def get_source(self):
         return self._source
 
-    def generate_streamables(self):
+    def generate_streamables(self, no_video=True):
         """Generates the streamables attributes for the current Media object.
            sets self._name and self._playable. This function returns nothing"""
 
@@ -60,12 +60,14 @@ class Media:
                 url = info['formats'][0]['url']
 
                 self._name = info['title']
-                self._playable = discord.FFmpegPCMAudio(url, **ffmpeg_options)
+                if no_video:
+                    self._playable = discord.FFmpegPCMAudio(url, **ffmpeg_options)
 
         # The source is a link to a file TODO: Implement properly
         elif validators.url(self._source):
             self._name = "bruh??"
-            self._playable = discord.FFmpegPCMAudio(self._source, **ffmpeg_options)
+            if no_video:
+                self._playable = discord.FFmpegPCMAudio(self._source, **ffmpeg_options)
 
 
         # Treat source as a youtube query
