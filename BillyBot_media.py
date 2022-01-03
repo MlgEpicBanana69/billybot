@@ -30,7 +30,12 @@ class Media:
         return self._name
 
     def get_playable(self):
-        return self._playable
+        if self._playable is None:
+            self.generate_streamables()
+
+        temp = self._playable
+        self._playable = None
+        return temp
 
     def get_source(self):
         return self._source
@@ -88,9 +93,17 @@ class Player:
         self._loop = False
         self._queue = []
 
-    def shuffle(self):
+    async def shuffle(self):
         """Shuffles the queue"""
-        random.shuffle(self._queue)
+        if len(self._queue) > 0:
+            random.shuffle(self._queue)
+            temp = self._queue
+            self._queue = []
+            await self.stop()
+            await self.play(temp[0])
+            self._queue += temp[1::]
+
+
 
     def toggle_loop(self):
         """Toggles loop"""
@@ -105,36 +118,38 @@ class Player:
             voice.stop()
             return
 
-        if self._loop:
-            self.get_queue().append(self.get_queue().pop(0))
-        else:
-            self.get_queue().pop(0)
+        if len(self.get_queue()) > 0:
+            if self._loop:
+                self.get_queue().append(self.get_queue().pop(0))
+            else:
+                self.get_queue().pop(0)
 
         if len(self.get_queue()) > 0:
-            print("Playing {0} on guild {1}".format(self.get_queue()[0].get_name(), self.get_guild.__name__))
-            voice.play(self.get_queue()[0].get_playable(), after=lambda e: self.next())
+            print("Playing {0} on guild {1}".format(self.get_queue()[0].get_name(), self.get_guild().name))
+            voice.play(self.get_queue()[0](), after=lambda e: self.next())
 
     def current_song(self):
         """Returns the name of the current song"""
         return self.get_queue()[0].get_name()
 
-    async def play(self, source:Media):
-        """Adds a to the queue
+    async def play(self, media:Media):
+        """Adds a Media object to the queue"""
 
-            assumes source is valid"""
+        voice = get(self._bot.voice_clients, guild=self._guild)
+        #while voice.is_playing() and len(self._queue) == 0:
+        #    pass
 
         # Adds to queue if media is not None
-        self._queue.append(source)
+        self._queue.append(media)
 
         # Plays now if nothing is playing
-        voice = get(self._bot.voice_clients, guild=self._guild)
-        if self._queue[0] == source:
-            voice.play(source.get_playable(), after=lambda e: self.next())
+        if self._queue[0] == media:
+            voice.play(media(), after=lambda e: self.next())
 
     async def stop(self):
         """Stops and clears the queue"""
-        get(self._bot.voice_clients, guild=self._guild).stop()
         self._queue = []
+        get(self._bot.voice_clients, guild=self._guild).stop()
 
     async def pause(self):
         """Pauses playing the queue"""

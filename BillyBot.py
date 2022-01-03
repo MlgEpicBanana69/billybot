@@ -143,7 +143,7 @@ async def next_song(ctx):
 @BillyBot.command(aliases=["Shuffle"])
 async def shuffle(ctx):
     """Shuffles the queue"""
-    bb_media.Player.get_player(ctx.guild).shuffle()
+    await bb_media.Player.get_player(ctx.guild).shuffle()
 
 @BillyBot.command(aliases=["Loop", "loop"])
 async def toggle_loop(ctx):
