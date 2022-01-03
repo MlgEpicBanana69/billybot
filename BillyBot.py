@@ -21,7 +21,7 @@ import BillyBot_media as bb_media
 #   ghost ping logging
 #   server managment commands
 #   the ultimate shitpost database
-#   Trade with TamaCrypto (Based!!)
+#   Trade with TamaCrypto (Based!!)3
 
 # https://discord.com/api/oauth2/authorize?client_id=757490339425550336&permissions=8&scope=bot
 
