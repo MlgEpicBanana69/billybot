@@ -96,13 +96,9 @@ class Player:
     async def shuffle(self):
         """Shuffles the queue"""
         if len(self._queue) > 0:
+            temp = self._queue.pop(0)
             random.shuffle(self._queue)
-            temp = self._queue
-            self._queue = []
-            await self.stop()
-            await self.play(temp[0])
-            self._queue += temp[1::]
-
+            self._queue.insert(0, temp)
 
 
     def toggle_loop(self):
@@ -114,19 +110,20 @@ class Player:
         """Skips to the next song in the queue"""
 
         voice = get(self._bot.voice_clients, guild=self._guild)
-        if voice.is_playing():
-            voice.stop()
-            return
+        if voice is not None:
+            if voice.is_playing():
+                voice.stop()
+                return
 
-        if len(self.get_queue()) > 0:
-            if self._loop:
-                self.get_queue().append(self.get_queue().pop(0))
-            else:
-                self.get_queue().pop(0)
+            if len(self.get_queue()) > 0:
+                if self._loop:
+                    self.get_queue().append(self.get_queue().pop(0))
+                else:
+                    self.get_queue().pop(0)
 
-        if len(self.get_queue()) > 0:
-            print("Playing {0} on guild {1}".format(self.get_queue()[0].get_name(), self.get_guild().name))
-            voice.play(self.get_queue()[0](), after=lambda e: self.next())
+            if len(self.get_queue()) > 0:
+                print("Playing {0} on guild {1}".format(self.get_queue()[0].get_name(), self.get_guild().name))
+                voice.play(self.get_queue()[0](), after=lambda e: self.next())
 
     def current_song(self):
         """Returns the name of the current song"""
@@ -149,7 +146,9 @@ class Player:
     async def stop(self):
         """Stops and clears the queue"""
         self._queue = []
-        get(self._bot.voice_clients, guild=self._guild).stop()
+        voice = get(self._bot.voice_clients, guild=self._guild)
+        if voice is not None:
+            get(self._bot.voice_clients, guild=self._guild).stop()
 
     async def pause(self):
         """Pauses playing the queue"""
@@ -174,9 +173,9 @@ class Player:
         """Returns the player's queue"""
         return self._queue
 
-    def wipe(self):
+    async def wipe(self):
         """Stops playing and wipes the player back into default settings"""
-        self.stop()
+        await self.stop()
 
         self._loop = False
         self._queue = []

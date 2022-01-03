@@ -206,7 +206,7 @@ async def leave(ctx):
         await ctx.channel.send("What")
     if ctx.guild.voice_client is not None:
         await ctx.guild.voice_client.disconnect()
-        bb_media.Player.get_player(ctx.guild).wipe()
+        await bb_media.Player.get_player(ctx.guild).wipe()
     else:
         await ctx.message.channel.send("I'm not in a voice channel! Use {0}join to make me join one.".format(BillyBot.command_prefix))
 
