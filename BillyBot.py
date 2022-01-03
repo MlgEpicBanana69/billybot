@@ -3,6 +3,7 @@
 import io
 import os
 import random
+from token import COMMA
 
 import aiohttp
 import discord
@@ -27,7 +28,8 @@ import BillyBot_media as bb_media
 
 intents = discord.Intents.default()
 intents.members = True
-BillyBot = commands.Bot(command_prefix='~', intents=intents)
+COMMAND_PREFIX = '~'
+BillyBot = commands.Bot(command_prefix=COMMAND_PREFIX, intents=intents)
 
 # Every auto list contains a two dimension tuple containing the member id and guild id
 # (id, guild_id)
@@ -51,7 +53,8 @@ async def on_message(message):
     # auto-say
     if message.guild is not None:
         if (message.author.id, message.guild.id) in auto_say_members:
-            await say(ctx=message, message=message.content)
+            if message.content[0] != COMMAND_PREFIX:
+                await say(ctx=message, message=message.content)
     await BillyBot.process_commands(message)
 
 @BillyBot.event
@@ -89,9 +92,8 @@ async def play(ctx, *, source=None):
 
     # also when multiple sources are given, BillyBot takes only the first one
     # further attachments are *completely* ignored."""
-    voice = get(BillyBot.voice_clients, guild=ctx.guild)
-    client_voice = ctx.author.voice
-    if client_voice is not None:
+
+    if ctx.author.voice is not None:
         await join(ctx)
         guild_player = bb_media.Player.get_player(ctx.guild)
 
@@ -150,20 +152,11 @@ async def goto(ctx, position : int):
     """Skips to a position in queue"""
     await bb_media.Player.get_player(ctx.guild).goto(position)
 
-@BillyBot.command(aliases=["current"])
-async def current_song(ctx):
-    """Shows the current song that is playing"""
-    guild_player = bb_media.Player.get_player(ctx.guild)
-    if len(guild_player.get_sourcenames()) > 0:
-        await ctx.channel.send("Currently playing {0} at position: {1}".format(guild_player.current_song()[0], guild_player.current_song()[1]))
-    else:
-        await ctx.channel.send("I am currently not playing anything!")
-
 @BillyBot.command(aliases=["Queue", "queue", "q", "Q"])
 async def song_queue(ctx):
     """Displays the current queue"""
     guild_player = bb_media.Player.get_player(ctx.guild)
-    queue_string = "\n".join([media.get_name() for media in guild_player.get_queue()])
+    queue_string = "\n".join([f"{i+1}. " + media.get_name() for i, media in enumerate(guild_player.get_queue())])
     if queue_string != "":
         await ctx.channel.send(queue_string)
     else:

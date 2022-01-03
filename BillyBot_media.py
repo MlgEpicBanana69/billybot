@@ -1,6 +1,9 @@
 import random
+import re
+from typing import final
 import requests
 import mimetypes
+from requests.api import request
 mimetypes.init()
 
 import validators
@@ -38,9 +41,27 @@ class Media:
         return self._source
 
     @staticmethod
-    def query_youtube(q):
+    def query_youtube(query_str):
         """Query youtube using a query and returns a list of the """
-        raise NotImplementedError()
+        prefix = "https://www.youtube.com/results?search_query="
+        blacklisted_characters = r"@#$%^&+=|\][}{';:?/,`><" + '"'
+        search = query_str
+        search = ''.join([c for c in search if ord(c) >= 32])
+        search = ''.join([f"%{hex(ord(c))[2::].upper()}" if c in blacklisted_characters else c for c in search])
+        search = search.replace(' ', '+')
+        search = prefix + search
+
+        resp = requests.get(search)
+        videos_found = [tag[-11::] for tag in re.findall('{"videoId":"[\d\w]{11}', resp.content.decode('utf-8'))]
+        SIZE = 10
+        video_prefix = "https://www.youtube.com/watch?v="
+        final_recommandations = []
+        for i in range(len(videos_found)):
+            if len(final_recommandations) == SIZE:
+                break
+            if video_prefix + videos_found[i] not in final_recommandations:
+                final_recommandations.append(video_prefix + videos_found[i])
+        return final_recommandations
 
     def source_route(self):
         """Sets the Media's _route_type variable"""
