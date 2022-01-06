@@ -1,6 +1,5 @@
 import random
 import re
-from typing import final
 import requests
 import mimetypes
 from requests.api import request
@@ -23,7 +22,7 @@ class Media:
         assert self._route_type is not None
 
     def __str__(self):
-        return self._name
+        return self.__repr__()
 
     def __repr__(self):
         return "Media<{0}>".format(self._name)
@@ -77,44 +76,55 @@ class Media:
                         route = "generic_" + mimestart.split('/')[0]
         self._route_type = route
 
-    def fetch_file(self, url):
+    def fetch_file(self):
         # 100MB
         size_limit = 104857600
 
-        # The url is to a file
-        if self.source_route(url) == "generic_streamable_media":
-            resp = requests.get(self._source, stream=True)
-            resp.raise_for_status()
+        resp = requests.get(self._source, stream=True)
+        resp.raise_for_status()
+        if len(resp.content) > size_limit:
+            raise ValueError('respose too large')
 
-            if len(resp.content) > size_limit:
-                raise ValueError('respose too large')
+        contents = bytes()
+        # 8MB
+        curr_size = 0
+        for chunk in resp.iter_content(size_limit):
+            curr_size += len(chunk)
+            if curr_size > size_limit:
+                raise ValueError("response too large")
+            contents += chunk
+        self._content = contents
 
-            contents = bytes()
-            # 8MB
-            curr_size = 0
-            for chunk in resp.iter_content(size_limit):
-                curr_size += len(chunk)
-                if curr_size > size_limit:
-                    raise ValueError("response too large")
-                contents += chunk
-            return contents
+    def get_route_type(self):
+        return self._route_type
 
 class Streamable(Media):
+    # One time use discord streamable stream object
+    _stream = None
+
     def __init__(self, source):
         super().__init__(source)
-        self.generate_content()
+        self.generate_stream()
+
+    def get_stream(self):
+        if self._stream is None:
+            self.generate_stream()
+        # stream is one time use and is disposed of
+        temp = self._stream
+        self._stream = None
+        return temp
+
+    def generate_content(self):
+        self.fetch_file()
 
     def get_content(self):
         if self._content is None:
             self.generate_content()
-        # Streamable content is one time use and is desposed of
-        temp = self._content
-        self._content = None
-        return temp
+        return self._content
 
-    def generate_content(self, no_video=True):
+    def generate_stream(self, no_video=True):
         """Generates the streamables attributes for a Streamable object.
-           sets self._name and self._content. This function returns nothing"""
+           sets self._name and self._stream. This function returns nothing"""
 
         # Options that seem to work perfectly (?)
         # ydl_options = {'format': 'bestaudio', 'noplaylist':'True'}
@@ -133,13 +143,16 @@ class Streamable(Media):
 
                 self._name = info['title']
                 if no_video:
-                    self._content = discord.FFmpegPCMAudio(url, **ffmpeg_options)
+                    self._stream = discord.FFmpegPCMAudio(url, **ffmpeg_options)
 
         # The source is a link to a file TODO: Implement properly
         elif self._route_type in ["generic_video", "generic_audio"]:
             self._name = self._source.split('/')[-1]
             if no_video:
-                self._content = discord.FFmpegPCMAudio(self._source, **ffmpeg_options)
+                self._stream = discord.FFmpegPCMAudio(self._source, **ffmpeg_options)
+
+    def __repr__(self):
+        "streamableMedia<{0}>".format(self._name)
 
 class Static(Media):
     def __init__(self, source):
@@ -149,9 +162,11 @@ class Static(Media):
     def get_content(self):
         return self._content
 
+    def __repr__(self):
+        "staticMedia<{0}>".format(self._name)
+
     def generate_content(self):
-        if self.source_route() != "youtube_media":
-            self._content = self.fetch_file(self._source)
+        self.fetch_file()
 
 # Need to improve on queue editing, design
 # add youtube query

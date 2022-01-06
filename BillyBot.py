@@ -6,6 +6,7 @@ import random
 
 import aiohttp
 import discord
+from discord import message
 from discord.ext import commands
 from discord.utils import get
 import cv2
@@ -245,38 +246,27 @@ async def squaretext(ctx, *, message):
 @BillyBot.command(aliases=["Cyber", "CYBER", "cybee", "Cybee"])
 async def cyber(ctx, *args):
     """Overlays the text סייבר on a given image."""
+
+    message_sources = all_ctx_sources(ctx, args)
     img_objects = []
-    if ctx.message.attachments != []:
-        for attachment in ctx.message.attachments:
-            if attachment.height is not None:
-                attachment_bytestring = await attachment.read()
-                img_object = cv2.imdecode(np.frombuffer(attachment_bytestring, np.uint8), cv2.IMREAD_UNCHANGED)
-                if len(img_object[0, 0]) == 3:
-                    img_object = cv2.cvtColor(img_object, cv2.COLOR_RGB2RGBA)
-                img_objects.append(img_object)
-    if len(args) > 0:
-        for img_link in args:
-            if validators.url(img_link):
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(img_link) as resp:
-                        if resp.status == 200:
-                            img_bytestring = await resp.read()
-                            img_object = cv2.imdecode(np.frombuffer(img_bytestring, np.uint8), cv2.IMREAD_UNCHANGED)
-                            if img_object is None:
-                                continue
-                            if len(img_object[0, 0]) == 3:
-                                img_object = cv2.cvtColor(img_object, cv2.COLOR_RGB2RGBA)
-                            img_objects.append(img_object)
+    for i, source in enumerate(message_sources):
+        image_obj = bb_media.Static(source)
+        if image_obj is not None:
+            if image_obj.get_route_type() == "generic_image":
+                nparr = np.frombuffer(image_obj.get_content(), np.uint8)
+                cv2_img_obj = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                cv2.imwrite("sus.jpg", cv2_img_obj)
+                img_objects.append(cv2.imdecode(nparr, cv2.IMREAD_COLOR))
             else:
-                continue
-    if (ctx.message.attachments == [] and len(args) == 0):
+                # Discard unsupported static media formats
+                message_sources.pop(i)
+    if (len(message_sources) == 0):
         await ctx.channel.send("You must attach an image file or pass a link as the last argument to the command message!")
         return
+
     # processing and final sending goes here!
     for img_object in img_objects:
         current_img = img_object
-        #C:\Users\MlgEp\My Drive\HOME\Python\Projects\Self\anime_cyber\Discord bot
-        #C:\\Users\\MlgEp\\Google Drive\\HOME\\Python\\Projects\\Self\\anime_cyber\\Discord bot\\foreground.png
         foreground_image = cv2.imread("resources\\foreground.png", cv2.IMREAD_UNCHANGED)
         foreground_img_ratio = foreground_image.shape[1] / foreground_image.shape[0]
         if current_img.shape[1] >= current_img.shape[0]:
@@ -370,6 +360,17 @@ async def minesweeper(ctx, width, height, mines):
         await ctx.channel.send(minesweeper_message)
     else:
         await ctx.channel.send("Board contents too long (more than 2000 characters)! Try making a smaller board...")
+
+def all_ctx_sources(ctx, args):
+    "Returns a of all file sources from given ctx + *args"
+    output = []
+    if ctx.message.attachments != []:
+        for attachment in ctx.message.attachments:
+            output.append(attachment.url)
+    for arg in args:
+        if validators.url(arg):
+            output.append(arg)
+    return output
 
 with open("token.txt", "r", encoding="UTF-8") as token_f:
     BillyBot.run(token_f.read())
