@@ -254,9 +254,7 @@ async def cyber(ctx, *args):
         if image_obj is not None:
             if image_obj.get_route_type() == "generic_image":
                 nparr = np.frombuffer(image_obj.get_content(), np.uint8)
-                cv2_img_obj = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-                cv2.imwrite("sus.jpg", cv2_img_obj)
-                img_objects.append(cv2.imdecode(nparr, cv2.IMREAD_COLOR))
+                img_objects.append(cv2.imdecode(nparr, cv2.IMREAD_UNCHANGED))
             else:
                 # Discard unsupported static media formats
                 message_sources.pop(i)
@@ -265,8 +263,7 @@ async def cyber(ctx, *args):
         return
 
     # processing and final sending goes here!
-    for img_object in img_objects:
-        current_img = img_object
+    for current_img in img_objects:
         foreground_image = cv2.imread("resources\\foreground.png", cv2.IMREAD_UNCHANGED)
         foreground_img_ratio = foreground_image.shape[1] / foreground_image.shape[0]
         if current_img.shape[1] >= current_img.shape[0]:
