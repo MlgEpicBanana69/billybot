@@ -2,7 +2,6 @@ import random
 import re
 import requests
 import mimetypes
-from requests.api import request
 mimetypes.init()
 
 import validators
@@ -40,7 +39,7 @@ class Media:
         return self._source
 
     @staticmethod
-    def query_youtube(query_str):
+    def query_youtube(query_str, SIZE=10):
         """Query youtube using a query and returns a list of the """
         prefix = "https://www.youtube.com/results?search_query="
         blacklisted_characters = r"@#$%^&+=|\][}{';:?/,`><" + '"'
@@ -51,15 +50,19 @@ class Media:
         search = prefix + search
 
         resp = requests.get(search)
-        videos_found = [tag[-11::] for tag in re.findall('{"videoId":"[\d\w]{11}', resp.content.decode('utf-8'))]
-        SIZE = 10
         video_prefix = "https://www.youtube.com/watch?v="
+
+        video_ids = []
+        for tag in re.findall('{"videoId":"[\d\w]{11}",', resp.content.decode('utf-8')):
+            if video_prefix + tag[12:-2:] not in video_ids:
+                video_ids.append(video_prefix + tag[12:-2:])
+        video_titles = [tag[26:-3:] for tag in re.findall('"title":\{"runs":\[\{"text":".+?"\}\]', resp.content.decode('utf-8'))[:-10:]]
+        videos_found = list(zip(video_ids, video_titles))[:SIZE:]
+
         final_recommandations = []
-        for i in range(len(videos_found)):
-            if len(final_recommandations) == SIZE:
-                break
-            if video_prefix + videos_found[i] not in final_recommandations:
-                final_recommandations.append(video_prefix + videos_found[i])
+        for video in videos_found:
+            if video[0] not in final_recommandations:
+                final_recommandations.append(video)
         return final_recommandations
 
     def source_route(self):
@@ -175,19 +178,14 @@ class Player:
 
     _players = []  # static variable containing ALL player objects
 
-    _guild = None  # The guild that the player is binded to
-    _bot = None
-    _loop = None   # Is the player in loop state
-    _queue = None    # The queue of songs in order
-
     def __init__(self, guild, bot):
         self._players.append(self)
 
-        self._guild = guild
+        self._guild = guild  # The guild that the player is binded to
         self._bot = bot
 
-        self._loop = False
-        self._queue = []
+        self._loop = False # Is the player in loop state
+        self._queue = [] # The queue of songs in order
 
     async def shuffle(self):
         """Shuffles the queue"""

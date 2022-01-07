@@ -6,15 +6,15 @@ import random
 
 import aiohttp
 import discord
-from discord import message
 from discord.ext import commands
 from discord.utils import get
+
 import cv2
 import numpy as np
 import validators
 
 import BillyBot_utils as bb_utils
-import BillyBot_minesweeper as bb_minesweeper
+import BillyBot_games as bb_games
 import BillyBot_media as bb_media
 
 # Ideas:
@@ -97,17 +97,25 @@ async def play(ctx, *, source=None):
         await join(ctx)
         guild_player = bb_media.Player.get_player(ctx.guild)
 
+        # Source is attachment
         if len(ctx.message.attachments) > 0:
             attachment = ctx.message.attachments[0]
             media = bb_media.Streamable(attachment.url)
             await guild_player.play(media)
 
+        # Source is message content
         elif validators.url(source):
             media = bb_media.Streamable(source)
             await guild_player.play(media)
 
+        # Source is youtube query
         elif source is not None:
-            raise NotImplementedError()
+            results = bb_media.Media.query_youtube(source)
+            await ctx.message.channel.send("\n".join([entry[1] for entry in results]))
+
+
+            media = bb_media.Streamable(source)
+            await guild_player.play(media)
     else:
         ctx.channel.send("You're not in any voice channel.")
 
@@ -349,7 +357,7 @@ async def minesweeper(ctx, width, height, mines):
         await ctx.channel.send("Invalid paramenters!")
         return
 
-    minesweeper_game = bb_minesweeper.Minesweeper(width, height, mines)
+    minesweeper_game = bb_games.Minesweeper(width, height, mines)
     minesweeper_game.generate()
     minesweeper_message = str(minesweeper_game)
 
