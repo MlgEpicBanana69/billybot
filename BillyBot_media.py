@@ -6,6 +6,7 @@ mimetypes.init()
 
 import validators
 from youtube_dl import YoutubeDL
+from urllib.parse import urlparse
 import discord
 from discord.utils import get
 
@@ -20,14 +21,14 @@ class Media:
         self.source_route()
         assert self._route_type is not None
 
+    def __call__(self):
+        return self.get_content()
+
     def __str__(self):
         return self.__repr__()
 
     def __repr__(self):
         return "Media<{0}>".format(self._name)
-
-    def __call__(self):
-        return self.get_content()
 
     def get_name(self):
         return self._name
@@ -73,7 +74,7 @@ class Media:
             if self._source.startswith("https://www.youtube.com/watch?v="):
                 route = "youtube_media"
             elif '.' in self._source and '/' in self._source:
-                mimestart = mimetypes.guess_type(self._source.split('/')[-1])[0]
+                mimestart = mimetypes.guess_type(urlparse(self._source).path.split('/')[-1])[0]
                 if mimestart is not None:
                     if mimestart.split('/')[0] in ['video', 'audio', 'image']:
                         route = "generic_" + mimestart.split('/')[0]
@@ -108,6 +109,9 @@ class Streamable(Media):
     def __init__(self, source):
         super().__init__(source)
         self.generate_stream()
+
+    def __call__(self):
+        return self.get_stream()
 
     def get_stream(self):
         if self._stream is None:
@@ -233,7 +237,7 @@ class Player:
 
         # Plays now if nothing is playing
         if self._queue[0] == media:
-            voice.play(media(), after=lambda e: self.next())
+            voice.play(media.get_stream(), after=lambda e: self.next())
 
     async def stop(self):
         """Stops and clears the queue"""

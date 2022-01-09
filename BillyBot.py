@@ -3,6 +3,7 @@
 import io
 import os
 import random
+from urllib.parse import urlparse
 
 import aiohttp
 import discord
@@ -58,28 +59,8 @@ async def on_message(message):
 async def on_guild_join(guild):
     bb_media.Player(guild, BillyBot)
 
-@BillyBot.slash_command(name="mute")
-@commands.has_permissions(mute_members=True)
-async def mute(ctx, member : discord.Member):
-    """Mutes a member or everyone in your voice call with the argument all"""
-    if member == "all" and ctx.voice is not None:
-        for participant in ctx.voice.channel.members:
-            await participant.edit(mute=True)
-    else:
-        await member.edit(mute=True)
-
-@BillyBot.slash_command(name="unmute")
-@commands.has_permissions(mute_members=True)
-async def unmute(ctx, member : discord.Member):
-    """Unmutes a member or everyone in your voice call with the argument all"""
-    if member == "all" and ctx.voice is not None:
-        for participant in ctx.voice.channel.members:
-            participant.edit(mute=False)
-    else:
-        await member.edit(mute=False)
-
 @BillyBot.slash_command(name="play")
-async def play(ctx, *, source=None):
+async def play(ctx, source):
     """Plays audio from an audio source
 
     # Playing a 'source' goes by a these rules:
@@ -95,24 +76,29 @@ async def play(ctx, *, source=None):
         guild_player = bb_media.Player.get_player(ctx.guild)
 
         # Source is attachment
-        if len(ctx.message.attachments) > 0:
-            attachment = ctx.message.attachments[0]
-            media = bb_media.Streamable(attachment.url)
-            await guild_player.play(media)
+        #if len(ctx.message.attachments) > 0:
+        #    attachment = ctx.message.attachments[0]
+        #    media = bb_media.Streamable(attachment.url)
+        #    await guild_player.play(media)#
 
+        await ctx.defer()
         # Source is message content
-        elif validators.url(source):
+        if validators.url(source):
             media = bb_media.Streamable(source)
             await guild_player.play(media)
+            await ctx.respond(media.get_name())
 
         # Source is youtube query
-        elif source is not None:
+        else:
             results = bb_media.Media.query_youtube(source)
-            await ctx.message.channel.send("\n".join([entry[1] for entry in results]))
+            await ctx.channel.send("\n".join([entry[1] for entry in results]))
 
+            # TODO: Reactive video choosing
+            chosen_result = results[0]
 
-            media = bb_media.Streamable(source)
+            media = bb_media.Streamable(chosen_result[0])
             await guild_player.play(media)
+            await ctx.respond(f"{chosen_result[1]} added to queue!")
     else:
         ctx.respond("You're not in any voice channel.")
 
@@ -135,8 +121,8 @@ async def resume(ctx):
         await ctx.respond("Resumed.")
         await bb_media.Player.get_player(ctx.guild).resume()
 
-@BillyBot.slash_command(name="next_song")
-async def next_song(ctx):
+@BillyBot.slash_command(name="skip")
+async def skip(ctx):
     """Skips to the next song in queue"""
     bb_media.Player.get_player(ctx.guild).next()
 
@@ -145,20 +131,20 @@ async def shuffle(ctx):
     """Shuffles the queue"""
     await bb_media.Player.get_player(ctx.guild).shuffle()
 
-@BillyBot.slash_command(name="toggle_loop")
-async def toggle_loop(ctx):
+@BillyBot.slash_command(name="loop")
+async def loop(ctx):
     """Toggles playlist loop on/off"""
     loop_state = bb_media.Player.get_player(ctx.guild).toggle_loop()
     loop_state = "ON" if loop_state else "OFF"
-    await ctx.respond("Loop state is now {0}".format(loop_state))
+    await ctx.respond("Loop is now {0}".format(loop_state))
 
-@BillyBot.slash_command(name="goto")
-async def goto(ctx, position : int):
+@BillyBot.slash_command(name="skipto")
+async def skipto(ctx, position:int):
     """Skips to a position in queue"""
     await bb_media.Player.get_player(ctx.guild).goto(position)
 
-@BillyBot.slash_command(name="song_queue")
-async def song_queue(ctx):
+@BillyBot.slash_command(name="queue")
+async def queue(ctx):
     """Displays the current queue"""
     guild_player = bb_media.Player.get_player(ctx.guild)
     queue_string = "\n".join([f"{i+1}. " + media.get_name() for i, media in enumerate(guild_player.get_queue())])
@@ -180,7 +166,7 @@ async def join(ctx):
     try:
         await ctx.guild.me.edit(deafen=True)
     except discord.errors.Forbidden:
-        pass # Silent permission error because the self deafen is purely cosmetic kekW
+        raise # Silent permission error because the self deafen is purely cosmetic kekW
 
 @BillyBot.slash_command(name="leave")
 async def leave(ctx):
@@ -191,7 +177,7 @@ async def leave(ctx):
         await ctx.guild.voice_client.disconnect()
         await bb_media.Player.get_player(ctx.guild).wipe()
     else:
-        await ctx.message.channel.send("I'm not in a voice channel! Use {0}join to make me join one.".format(BillyBot.command_prefix))
+        await ctx.respond("I'm not in a voice channel! Use /join to make me join one.")
 
 @BillyBot.slash_command(name="squaretext")
 async def squaretext(ctx, message):
@@ -244,22 +230,26 @@ async def squaretext(ctx, message):
             splitted_final_message.append(splitted_message)
 
         for part in splitted_final_message:
-            await ctx.message.channel.send(part)
+            await ctx.respond(part)
     else:
         await ctx.respond(content="", file=discord.File(fp=io.StringIO(final_message), filename="squared_text.txt"))
 
 @BillyBot.slash_command(name="cyber")
-async def cyber(ctx, *args):
+async def cyber(ctx, args=""):
     """Overlays the text סייבר on a given image."""
 
-    message_sources = all_ctx_sources(ctx, args)
+    await ctx.defer()
+    message_sources = _all_ctx_sources(ctx, args)
     img_objects = []
     for i, source in enumerate(message_sources):
         image_obj = bb_media.Static(source)
         if image_obj is not None:
             if image_obj.get_route_type() == "generic_image":
-                nparr = np.frombuffer(image_obj.get_content(), np.uint8)
-                img_objects.append(cv2.imdecode(nparr, cv2.IMREAD_UNCHANGED))
+                nparr = np.frombuffer(image_obj(), np.uint8)
+                cv2_img = cv2.imdecode(nparr, cv2.IMREAD_UNCHANGED)
+                if len(cv2_img[0][0]) < 4:
+                    cv2_img = cv2.cvtColor(cv2_img, cv2.COLOR_RGB2RGBA)
+                img_objects.append(cv2_img)
             else:
                 # Discard unsupported static media formats
                 message_sources.pop(i)
@@ -295,7 +285,7 @@ async def bibi(ctx):
     """Sends a picture of Israel's **EX** prime minister Benjamin Netanyahu."""
     bb_images = os.listdir("resources\\bibi\\")
     with open("resources\\bibi\\" + random.choice(bb_images), "rb") as bb_pick:
-        await ctx.message.channel.send(file=discord.File(fp=bb_pick, filename="bb.png"))
+        await ctx.respond(file=discord.File(fp=bb_pick, filename="bb.png"))
 
 @BillyBot.slash_command(name="say")
 async def say(ctx, message):
@@ -340,7 +330,7 @@ async def remindme(ctx, reminder:str, seconds:int):
 
 @BillyBot.slash_command(name="minesweeper")
 async def minesweeper(ctx, width:int, height:int, mines:int):
-    """ Play minesweeper, powered by BillyBot """
+    """Play minesweeper, powered by BillyBot™"""
 
     # Criterias for a valid game
     try:
@@ -365,13 +355,13 @@ async def minesweeper(ctx, width:int, height:int, mines:int):
     else:
         await ctx.respond("Board contents too long (more than 2000 characters)! Try making a smaller board...")
 
-def all_ctx_sources(ctx, args):
-    "Returns a of all file sources from given ctx + *args"
+def _all_ctx_sources(ctx, args):
+    "Returns a of all file sources from given ctx + args"
     output = []
-    if ctx.message.attachments != []:
-        for attachment in ctx.message.attachments:
-            output.append(attachment.url)
-    for arg in args:
+    #if ctx.message.attachments != []:
+    #    for attachment in ctx.message.attachments:
+    #         output.append(attachment.url)
+    for arg in args.split():
         if validators.url(arg):
             output.append(arg)
     return output
