@@ -123,6 +123,21 @@ async def squaretext(ctx, message):
         await ctx.respond(final_message)
     else:
         await ctx.respond(content="", file=discord.File(fp=io.StringIO(final_message), filename="squared_text.txt"))
+
+@BillyBot.slash_command(name="doomsday")
+async def doomsday(ctx, day:int, month:int, year:int):
+    """Tells you what day a given date is using the doomsday algorithm"""
+    days_of_the_week = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+    centuary_anchors = [5, 3, 2, 0]
+    anchor_day = centuary_anchors[(year // 100 - 18) % 4]
+
+    calc1 = (year - year // 100 * 100) // 12
+    calc2 = abs((calc1 * 12) - (year - year // 100 * 100))
+    calc3 = 6 // 4
+    calc4 = anchor_day
+    calc5 = calc1 + calc2 + calc3 + calc4
+    calc6 = calc5 % 7
+    await ctx.respond(f"{day}/{month}/{year} is a {days_of_the_week[calc6]}")
 #endregion
 
 #region Chat toggles
