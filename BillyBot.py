@@ -24,12 +24,11 @@ import BillyBot_media as bb_media
 #   the ultimate shitpost database
 #   Trade with TamaCrypto (Based!!)
 
-# https://discord.com/api/oauth2/authorize?client_id=757490339425550336&permissions=8&scope=bot
+# https://discord.com/api/oauth2/authorize?client_id=757490339425550336&permissions=8&scope=applications.commands%20bot
 
 intents = discord.Intents.default()
 intents.members = True
-COMMAND_PREFIX = '~'
-BillyBot = commands.Bot(command_prefix=COMMAND_PREFIX, intents=intents)
+BillyBot = discord.Bot(intents=intents)
 
 # Every auto list contains a two dimension tuple containing the member id and guild id
 # (id, guild_id)
@@ -53,15 +52,13 @@ async def on_message(message):
     # auto-say
     if message.guild is not None:
         if (message.author.id, message.guild.id) in auto_say_members:
-            if message.content[0] != COMMAND_PREFIX:
-                await say(ctx=message, message=message.content)
-    await BillyBot.process_commands(message)
+            await message.channel.send(message)
 
 @BillyBot.event
 async def on_guild_join(guild):
     bb_media.Player(guild, BillyBot)
 
-@BillyBot.command(aliases=["Mute", "mutee", "mut", "Mutee", "Mut"])
+@BillyBot.slash_command(name="mute")
 @commands.has_permissions(mute_members=True)
 async def mute(ctx, member : discord.Member):
     """Mutes a member or everyone in your voice call with the argument all"""
@@ -71,7 +68,7 @@ async def mute(ctx, member : discord.Member):
     else:
         await member.edit(mute=True)
 
-@BillyBot.command(aliases=["UnMute", "unmutee", "unmut", "UnMutee", "UnMut", "Unmute", "ummute", "Ummute"])
+@BillyBot.slash_command(name="unmute")
 @commands.has_permissions(mute_members=True)
 async def unmute(ctx, member : discord.Member):
     """Unmutes a member or everyone in your voice call with the argument all"""
@@ -81,7 +78,7 @@ async def unmute(ctx, member : discord.Member):
     else:
         await member.edit(mute=False)
 
-@BillyBot.command(aliases=["Play", "pla", "Pla", "p", "P"])
+@BillyBot.slash_command(name="play")
 async def play(ctx, *, source=None):
     """Plays audio from an audio source
 
@@ -117,64 +114,64 @@ async def play(ctx, *, source=None):
             media = bb_media.Streamable(source)
             await guild_player.play(media)
     else:
-        ctx.channel.send("You're not in any voice channel.")
+        ctx.respond("You're not in any voice channel.")
 
-@BillyBot.command(aliases=["Stop", "Stoop", "stoop", "Sto", "sto", "stopp", "Stopp", "Clear", "clear"])
+@BillyBot.slash_command(name="stop")
 async def stop(ctx):
     """Stops the music and clears the queue"""
     await bb_media.Player.get_player(ctx.guild).stop()
 
-@BillyBot.command(aliases=["Pause"])
+@BillyBot.slash_command(name="pause")
 async def pause(ctx):
     """Pauses the current song"""
     if ctx.guild.me.voice.channel == ctx.author.voice.channel and ctx.guild.me.voice is not None:
-        await ctx.channel.send("Now paused.")
+        await ctx.respond("Now paused.")
         await bb_media.Player.get_player(ctx.guild).pause()
 
-@BillyBot.command(aliases=["Resume"])
+@BillyBot.slash_command(name="resume")
 async def resume(ctx):
     """Pauses the current song"""
     if ctx.guild.me.voice.channel == ctx.author.voice.channel and ctx.guild.me.voice is not None:
-        await ctx.channel.send("Resumed.")
+        await ctx.respond("Resumed.")
         await bb_media.Player.get_player(ctx.guild).resume()
 
-@BillyBot.command(aliases=["Next", "next", "skip", "Skip"])
+@BillyBot.slash_command(name="next_song")
 async def next_song(ctx):
     """Skips to the next song in queue"""
     bb_media.Player.get_player(ctx.guild).next()
 
-@BillyBot.command(aliases=["Shuffle"])
+@BillyBot.slash_command(name="shuffle")
 async def shuffle(ctx):
     """Shuffles the queue"""
     await bb_media.Player.get_player(ctx.guild).shuffle()
 
-@BillyBot.command(aliases=["Loop", "loop"])
+@BillyBot.slash_command(name="toggle_loop")
 async def toggle_loop(ctx):
     """Toggles playlist loop on/off"""
     loop_state = bb_media.Player.get_player(ctx.guild).toggle_loop()
     loop_state = "ON" if loop_state else "OFF"
-    await ctx.channel.send("Loop state is now {0}".format(loop_state))
+    await ctx.respond("Loop state is now {0}".format(loop_state))
 
-@BillyBot.command(aliases=["Goto", "GoTo"])
+@BillyBot.slash_command(name="goto")
 async def goto(ctx, position : int):
     """Skips to a position in queue"""
     await bb_media.Player.get_player(ctx.guild).goto(position)
 
-@BillyBot.command(aliases=["Queue", "queue", "q", "Q"])
+@BillyBot.slash_command(name="song_queue")
 async def song_queue(ctx):
     """Displays the current queue"""
     guild_player = bb_media.Player.get_player(ctx.guild)
     queue_string = "\n".join([f"{i+1}. " + media.get_name() for i, media in enumerate(guild_player.get_queue())])
     if queue_string != "":
-        await ctx.channel.send(queue_string)
+        await ctx.respond(queue_string)
     else:
-        await ctx.channel.send("I am not playing anything right now!")
+        await ctx.respond("I am not playing anything right now!")
 
-@BillyBot.command(aliases=["Join"])
+@BillyBot.slash_command(name="join")
 async def join(ctx):
     """Joins into your voice channel."""
     if ctx.author.voice is None:
-        await ctx.channel.send("You're not in any voice channel.")
+        await ctx.respond("You're not in any voice channel.")
         return
     elif ctx.guild.voice_client is None:
         await ctx.author.voice.channel.connect()
@@ -185,19 +182,19 @@ async def join(ctx):
     except discord.errors.Forbidden:
         pass # Silent permission error because the self deafen is purely cosmetic kekW
 
-@BillyBot.command(aliases=["Leave", "leav", "Leav", "fuckoff"])
+@BillyBot.slash_command(name="leave")
 async def leave(ctx):
     """Leaves voice channel."""
     if ctx.guild is None:
-        await ctx.channel.send("What")
+        await ctx.respond("What")
     if ctx.guild.voice_client is not None:
         await ctx.guild.voice_client.disconnect()
         await bb_media.Player.get_player(ctx.guild).wipe()
     else:
         await ctx.message.channel.send("I'm not in a voice channel! Use {0}join to make me join one.".format(BillyBot.command_prefix))
 
-@BillyBot.command(aliases=["why", "Why", "Squaretext", "SquareText", "square", "Square", "wwhy", "Wwhy"])
-async def squaretext(ctx, *, message):
+@BillyBot.slash_command(name="squaretext")
+async def squaretext(ctx, message):
     """Squares text. Example: pog -> p\npo\npog\npo\np"""
 
     final_message = ""
@@ -233,7 +230,7 @@ async def squaretext(ctx, *, message):
         else:
             penelty += 1
     if len(final_message) <= 2000:
-        await ctx.message.channel.send(final_message)
+        await ctx.respond(final_message)
     elif len(final_message) <= 20000:
         splitted_message = ""
         splitted_final_message = []
@@ -249,9 +246,9 @@ async def squaretext(ctx, *, message):
         for part in splitted_final_message:
             await ctx.message.channel.send(part)
     else:
-        await ctx.channel.send(content="", file=discord.File(fp=io.StringIO(final_message), filename="squared_text.txt"))
+        await ctx.respond(content="", file=discord.File(fp=io.StringIO(final_message), filename="squared_text.txt"))
 
-@BillyBot.command(aliases=["Cyber", "CYBER", "cybee", "Cybee"])
+@BillyBot.slash_command(name="cyber")
 async def cyber(ctx, *args):
     """Overlays the text סייבר on a given image."""
 
@@ -267,7 +264,7 @@ async def cyber(ctx, *args):
                 # Discard unsupported static media formats
                 message_sources.pop(i)
     if (len(message_sources) == 0):
-        await ctx.channel.send("You must attach an image file or pass a link as the last argument to the command message!")
+        await ctx.respond("You must attach an image file or pass a link as the last argument to the command message!")
         return
 
     # processing and final sending goes here!
@@ -291,23 +288,21 @@ async def cyber(ctx, *args):
                         current_img[row + row_offset, col + col_offset] = bb_utils.merge_pixels(foreground_image[row, col], current_img[row + row_offset, col + col_offset])
                 except IndexError:
                     pass
-        await ctx.channel.send(content="", file=discord.File(fp=io.BytesIO(cv2.imencode(".png", current_img)[1].tobytes()), filename="outputImage.png"))
+        await ctx.respond(content="", file=discord.File(fp=io.BytesIO(cv2.imencode(".png", current_img)[1].tobytes()), filename="outputImage.png"))
 
-@BillyBot.command(aliases=["Bibi", "BiBi", "BB", "Bb", "bb"])
+@BillyBot.slash_command(name="bibi")
 async def bibi(ctx):
     """Sends a picture of Israel's **EX** prime minister Benjamin Netanyahu."""
     bb_images = os.listdir("resources\\bibi\\")
     with open("resources\\bibi\\" + random.choice(bb_images), "rb") as bb_pick:
         await ctx.message.channel.send(file=discord.File(fp=bb_pick, filename="bb.png"))
 
-@BillyBot.command(aliases=["Echo", "echo", "Say"])
-async def say(ctx, *, message):
+@BillyBot.slash_command(name="say")
+async def say(ctx, message):
     """Repeats a given message."""
-    await ctx.channel.send(message)
+    await ctx.respond(message)
 
-@BillyBot.command(aliases=["SayToggle", "Saytoggle", "echotoggle", "echome",
-                        "copycat", "Copycat", "Echome", "EchoMe", "CopyCat",
-                        "EchoToggle", "Echotoggle"])
+@BillyBot.slash_command(name="saytoggle")
 async def saytoggle(ctx):
     """Toggles on/off the auto echo function."""
 
@@ -318,29 +313,33 @@ async def saytoggle(ctx):
 
     await ctx.message.add_reaction("✅")
 
-@BillyBot.command(aliases=["Roll"])
-async def roll(ctx, start : int, end : int):
+@BillyBot.user_command(name="sus")
+async def sus(ctx, user):
+    await ctx.respond(f"{ctx.author.mention} susses out {user.mention}")
+
+@BillyBot.slash_command(name="roll")
+async def roll(ctx, start : int, end=100):
     """ Rolls a number in the given range where both ends are inclusive """
 
     if start > end:
-        await ctx.channel.send("Invalid range!")
+        await ctx.respond("Invalid range!")
         return
 
-    await ctx.channel.send("I rolled: {0}!".format(random.randint(start, end)))
+    await ctx.respond("I rolled: {0}!".format(random.randint(start, end)))
 
 @roll.error
 async def roll_error(ctx, error):
     """Handles errors on the roll command"""
     if isinstance(error, commands.BadArgument):
-        await ctx.channel.send("Invalid arguments! Follow the command format of: roll {start} {end}")
+        await ctx.respond("Invalid arguments! Follow the command format of: roll {start} {end}")
 
-@BillyBot.command(aliases=["RemindMe", "Remindme"])
-async def remindme(ctx, reminder, seconds : int):
+@BillyBot.slash_command(name="remindme")
+async def remindme(ctx, reminder:str, seconds:int):
     """Not implemented"""
     raise NotImplementedError
 
-@BillyBot.command(aliases=["Minesweeper"])
-async def minesweeper(ctx, width, height, mines):
+@BillyBot.slash_command(name="minesweeper")
+async def minesweeper(ctx, width:int, height:int, mines:int):
     """ Play minesweeper, powered by BillyBot """
 
     # Criterias for a valid game
@@ -354,7 +353,7 @@ async def minesweeper(ctx, width, height, mines):
         valid_game = False
 
     if not valid_game:
-        await ctx.channel.send("Invalid paramenters!")
+        await ctx.respond("Invalid paramenters!")
         return
 
     minesweeper_game = bb_games.Minesweeper(width, height, mines)
@@ -362,9 +361,9 @@ async def minesweeper(ctx, width, height, mines):
     minesweeper_message = str(minesweeper_game)
 
     if len(minesweeper_message) <= 2000:
-        await ctx.channel.send(minesweeper_message)
+        await ctx.respond(minesweeper_message)
     else:
-        await ctx.channel.send("Board contents too long (more than 2000 characters)! Try making a smaller board...")
+        await ctx.respond("Board contents too long (more than 2000 characters)! Try making a smaller board...")
 
 def all_ctx_sources(ctx, args):
     "Returns a of all file sources from given ctx + *args"
