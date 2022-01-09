@@ -127,6 +127,7 @@ async def squaretext(ctx, message):
 @BillyBot.slash_command(name="doomsday")
 async def doomsday(ctx, day:int, month:int, year:int):
     """Tells you what day a given date is using the doomsday algorithm"""
+    ctx.defer()
     days_of_the_week = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
     centuary_anchors = [5, 3, 2, 0]
     anchor_day = centuary_anchors[(year // 100 - 18) % 4]
