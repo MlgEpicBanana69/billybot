@@ -35,6 +35,7 @@ BillyBot = discord.Bot(intents=intents)
 # (id, guild_id)
 auto_say_members = []
 
+#region Bot events
 @BillyBot.event
 async def on_ready():
     """Does the initial setup for BillyBot"""
@@ -58,7 +59,86 @@ async def on_message(message):
 @BillyBot.event
 async def on_guild_join(guild):
     bb_media.Player(guild, BillyBot)
+#endregion
 
+#region Simple commands
+@BillyBot.slash_command(name="say")
+async def say(ctx, message):
+    """Repeats a given message."""
+    await ctx.respond(message)
+
+@BillyBot.slash_command(name="roll")
+async def roll(ctx, start : int, end=100):
+    """ Rolls a number in the given range where both ends are inclusive """
+
+    if start > end:
+        await ctx.respond("Invalid range!")
+        return
+
+    await ctx.respond("I rolled: {0}!".format(random.randint(start, end)))
+
+@roll.error
+async def roll_error(ctx, error):
+    """Handles errors on the roll command"""
+    if isinstance(error, commands.BadArgument):
+        await ctx.respond("Invalid arguments! Follow the command format of: roll {start} {end}")
+
+@BillyBot.slash_command(name="squaretext")
+async def squaretext(ctx, message):
+    """why (Squares text)"""
+
+    final_message = ""
+    build_up = []
+    message_by_lines = []
+    penelty = 0
+    for i in range(len(message)):
+        build_up.append(i)
+        new_line = ""
+        for num in build_up:
+            new_line += message[num]
+        if new_line[-1] == ' ':
+            new_line = new_line[:-1]
+        if new_line not in message_by_lines:
+            message_by_lines.append(new_line)
+            final_message += message_by_lines[i - penelty]
+            final_message += "\n"
+        else:
+            penelty += 1
+    penelty = 0
+    message_by_lines = []
+    for i in range(len(message) - 1):
+        del build_up[-1]
+        new_line = ""
+        for num in build_up:
+            new_line += message[num]
+        if new_line[-1] == ' ':
+            new_line = new_line[:-1]
+        if new_line not in message_by_lines:
+            message_by_lines.append(new_line)
+            final_message += message_by_lines[i - penelty]
+            final_message += "\n"
+        else:
+            penelty += 1
+    if len(final_message) <= 2000:
+        await ctx.respond(final_message)
+    else:
+        await ctx.respond(content="", file=discord.File(fp=io.StringIO(final_message), filename="squared_text.txt"))
+#endregion
+
+#region Chat toggles
+@BillyBot.slash_command(name="saytoggle")
+async def saytoggle(ctx):
+    """Toggles on/off the auto echo function."""
+
+    if (ctx.author.id, ctx.guild.id) not in auto_say_members:
+        auto_say_members.append((ctx.author.id, ctx.guild.id))
+        await ctx.respond("✅ Now ON")
+    else:
+        auto_say_members.remove((ctx.author.id, ctx.guild.id))
+        await ctx.respond("✅ Now OFF")
+#endregion
+
+#region Player commands
 @BillyBot.slash_command(name="play")
 async def play(ctx, source):
     """Plays audio from an audio source
@@ -152,7 +232,9 @@ async def queue(ctx):
         await ctx.respond(queue_string)
     else:
         await ctx.respond("I am not playing anything right now!")
+#endregion
 
+#region Voice commands
 @BillyBot.slash_command(name="join")
 async def join(ctx):
     """Joins into your voice channel."""
@@ -178,62 +260,9 @@ async def leave(ctx):
         await bb_media.Player.get_player(ctx.guild).wipe()
     else:
         await ctx.respond("I'm not in a voice channel! Use /join to make me join one.")
+#endregion
 
-@BillyBot.slash_command(name="squaretext")
-async def squaretext(ctx, message):
-    """Squares text. Example: pog -> p\npo\npog\npo\np"""
-
-    final_message = ""
-    build_up = []
-    message_by_lines = []
-    penelty = 0
-    for i in range(len(message)):
-        build_up.append(i)
-        new_line = ""
-        for num in build_up:
-            new_line += message[num]
-        if new_line[-1] == ' ':
-            new_line = new_line[:-1]
-        if new_line not in message_by_lines:
-            message_by_lines.append(new_line)
-            final_message += message_by_lines[i - penelty]
-            final_message += "\n"
-        else:
-            penelty += 1
-    penelty = 0
-    message_by_lines = []
-    for i in range(len(message) - 1):
-        del build_up[-1]
-        new_line = ""
-        for num in build_up:
-            new_line += message[num]
-        if new_line[-1] == ' ':
-            new_line = new_line[:-1]
-        if new_line not in message_by_lines:
-            message_by_lines.append(new_line)
-            final_message += message_by_lines[i - penelty]
-            final_message += "\n"
-        else:
-            penelty += 1
-    if len(final_message) <= 2000:
-        await ctx.respond(final_message)
-    elif len(final_message) <= 20000:
-        splitted_message = ""
-        splitted_final_message = []
-        for line in final_message.split("\n"):
-            if len(splitted_message + line + "\n") <= 2000:
-                splitted_message += line + "\n"
-            else:
-                splitted_final_message.append(splitted_message)
-                splitted_message = ""
-        if splitted_message != "":
-            splitted_final_message.append(splitted_message)
-
-        for part in splitted_final_message:
-            await ctx.respond(part)
-    else:
-        await ctx.respond(content="", file=discord.File(fp=io.StringIO(final_message), filename="squared_text.txt"))
-
+#region Processing commands
 @BillyBot.slash_command(name="cyber")
 async def cyber(ctx, args=""):
     """Overlays the text סייבר on a given image."""
@@ -286,48 +315,16 @@ async def bibi(ctx):
     bb_images = os.listdir("resources\\bibi\\")
     with open("resources\\bibi\\" + random.choice(bb_images), "rb") as bb_pick:
         await ctx.respond(file=discord.File(fp=bb_pick, filename="bb.png"))
+#endregion
 
-@BillyBot.slash_command(name="say")
-async def say(ctx, message):
-    """Repeats a given message."""
-    await ctx.respond(message)
-
-@BillyBot.slash_command(name="saytoggle")
-async def saytoggle(ctx):
-    """Toggles on/off the auto echo function."""
-
-    if (ctx.author.id, ctx.guild.id) not in auto_say_members:
-        auto_say_members.append((ctx.author.id, ctx.guild.id))
-    else:
-        auto_say_members.remove((ctx.author.id, ctx.guild.id))
-
-    await ctx.message.add_reaction("✅")
-
-@BillyBot.user_command(name="sus")
-async def sus(ctx, user):
-    await ctx.respond(f"{ctx.author.mention} susses out {user.mention}")
-
-@BillyBot.slash_command(name="roll")
-async def roll(ctx, start : int, end=100):
-    """ Rolls a number in the given range where both ends are inclusive """
-
-    if start > end:
-        await ctx.respond("Invalid range!")
-        return
-
-    await ctx.respond("I rolled: {0}!".format(random.randint(start, end)))
-
-@roll.error
-async def roll_error(ctx, error):
-    """Handles errors on the roll command"""
-    if isinstance(error, commands.BadArgument):
-        await ctx.respond("Invalid arguments! Follow the command format of: roll {start} {end}")
-
+#region Personal management
 @BillyBot.slash_command(name="remindme")
 async def remindme(ctx, reminder:str, seconds:int):
     """Not implemented"""
     raise NotImplementedError
+#endregion
 
+#region gaming
 @BillyBot.slash_command(name="minesweeper")
 async def minesweeper(ctx, width:int, height:int, mines:int):
     """Play minesweeper, powered by BillyBot™"""
@@ -354,7 +351,21 @@ async def minesweeper(ctx, width:int, height:int, mines:int):
         await ctx.respond(minesweeper_message)
     else:
         await ctx.respond("Board contents too long (more than 2000 characters)! Try making a smaller board...")
+#endregion
 
+#region Tag user commands
+@BillyBot.user_command(name="sus")
+async def sus(ctx, user):
+    """amogus"""
+    await ctx.respond(f"{ctx.author.mention} susses out {user.mention}")
+
+@BillyBot.user_command(name="love")
+async def love(ctx, user):
+    """Tag someone you like"""
+    await ctx.respond(f"{ctx.author.mention} ❤️ {user.mention} 🥰")
+#endregion
+
+#region Helper functions
 def _all_ctx_sources(ctx, args):
     "Returns a of all file sources from given ctx + args"
     output = []
@@ -365,6 +376,7 @@ def _all_ctx_sources(ctx, args):
         if validators.url(arg):
             output.append(arg)
     return output
+#endregion
 
 with open("token.txt", "r", encoding="UTF-8") as token_f:
     BillyBot.run(token_f.read())
