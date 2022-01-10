@@ -1,14 +1,17 @@
 """BillyBot is a general purpose discord bot that barely works"""
 
 import io
+from logging import debug
 import os
 import random
+import datetime
 from urllib.parse import urlparse
 
 import aiohttp
 import discord
 from discord.ext import commands
 from discord.utils import get
+import asyncio
 
 import cv2
 import numpy as np
@@ -152,6 +155,21 @@ async def saytoggle(ctx):
     else:
         auto_say_members.remove((ctx.author.id, ctx.guild.id))
         await ctx.respond("✅ Now OFF")
+#endregion
+
+#region Server managment commands
+@BillyBot.slash_command(name="wipe")
+@commands.has_permissions(manage_messages=True)
+async def wipe(ctx, n:int):
+    """Deletes n meesages from the current text channel"""
+    await ctx.defer()
+    history = await ctx.channel.history(limit=n+1).flatten()
+    initial_msg = history[0]
+    for msg in history[1::]:
+        await msg.delete()
+    await ctx.respond(f"Deleted {len(history[1::])} messages.")
+    await asyncio.sleep(5)
+    await initial_msg.delete()
 #endregion
 
 #region Player commands
