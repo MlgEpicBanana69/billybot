@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 
 import aiohttp
 import discord
+from discord.components import C
 from discord.ext import commands
 from discord.utils import get
 import asyncio
@@ -58,6 +59,19 @@ async def on_message(message):
     if message.guild is not None:
         if (message.author.id, message.guild.id) in auto_say_members:
             await message.channel.send(message)
+
+        #region Chat responds
+        billybot_mention = "<@!" + BillyBot.user.mention[2::]
+        if message.content.startswith(billybot_mention) or message.content.endswith(billybot_mention):
+            keyphrase = message.content.replace(billybot_mention, '').strip()
+            keyphrase = "".join(c for c in keyphrase if c.isalpha() or c == ' ')
+            cyber_intimidation = _cyber_intimidation(message, keyphrase)
+            respond_table = [cyber_intimidation]
+            for val in respond_table:
+                if val is not None:
+                    await message.channel.send(val)
+                    break
+        #endregion
 
 @BillyBot.event
 async def on_guild_join(guild):
@@ -411,6 +425,28 @@ def _all_ctx_sources(ctx, args):
             output.append(arg)
     return output
 #endregion
+
+#region intimidation responses
+def _cyber_intimidation(message, keyphrase):
+    insults = None
+    with open("resources/billy_insults.txt", mode="r", encoding='utf-8') as f:
+        insults = f.read().split('\n')
+    for insult in insults:
+        if insult in keyphrase:
+            return f"""{repr(message)}
+Connection-specific DNS Suffix  . :
+IPv6 Address. . . . . . . . . . . . . . . . . : f5d0:c4aa:ce18:12fc:
+IPv6 Address. . . . . . . . . . . . . . . . . : 3067:cdf0:fc0d:8e69:8a12:9536:f122:d92f
+Temporary IPv6 Address. . . . . . : 99a9:9d54:7497:fc7f:6a37:3983:
+Link-local IPv6 Address . . . . . . . : 4612:12f4:9830:86fc:4449:3a6b:tr72%7
+IPv4 Address. . . . . . . . . . . . . . . . . : 192.168.1.27
+Subnet Mask. . . . . . . . . . . . . . . . . : 255.255.255.0
+Default Gateway . . . . . . . . . . . . . : fe80::384ff:4300:0a77:0d79 :: 192.168.1.1
+{repr(message.author)}"""
+    else:
+        return None
+#endregion
+
 
 with open("token.txt", "r", encoding="UTF-8") as token_f:
     BillyBot.run(token_f.read())
