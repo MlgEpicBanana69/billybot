@@ -11,7 +11,7 @@ token.txt
 # Test file
 temp.txt
 
-.env
+BillyBot.env
 
 # Distribution / packaging
 .Python
