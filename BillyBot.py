@@ -9,10 +9,10 @@ from urllib.parse import urlparse
 
 import aiohttp
 import discord
-from discord.components import C
 from discord.ext import commands
 from discord.utils import get
 import asyncio
+from dotenv import load_dotenv
 
 import cv2
 import numpy as np
@@ -31,6 +31,8 @@ import BillyBot_media as bb_media
 
 # https://discord.com/api/oauth2/authorize?client_id=757490339425550336&permissions=8&scope=applications.commands%20bot
 
+load_dotenv()
+
 intents = discord.Intents.default()
 intents.members = True
 BillyBot = discord.Bot(intents=intents)
@@ -38,6 +40,9 @@ BillyBot = discord.Bot(intents=intents)
 # Every auto list contains a two dimension tuple containing the member id and guild id
 # (id, guild_id)
 auto_say_members = []
+
+discord_token = os.environ.get("discord_token")
+osu_token = os.environ.get("osu_token")
 
 #region Bot events
 @BillyBot.event
@@ -448,6 +453,4 @@ Default Gateway . . . . . . . . . . . . . : fe80::384ff:4300:0a77:0d79 :: 192.16
         return None
 #endregion
 
-
-with open("token.txt", "r", encoding="UTF-8") as token_f:
-    BillyBot.run(token_f.read())
+BillyBot.run(discord_token)
