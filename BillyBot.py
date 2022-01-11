@@ -69,6 +69,7 @@ async def on_message(message):
             respond_table = [cyber_intimidation]
             for val in respond_table:
                 if val is not None:
+                    await asyncio.sleep(2)
                     await message.channel.send(val)
                     break
         #endregion
@@ -433,7 +434,7 @@ def _cyber_intimidation(message, keyphrase):
         insults = f.read().split('\n')
     for insult in insults:
         if insult in keyphrase:
-            return f"""{repr(message)}
+            return f"""{message.author.mention} this you?\n{repr(message)}
 Connection-specific DNS Suffix  . :
 IPv6 Address. . . . . . . . . . . . . . . . . : f5d0:c4aa:ce18:12fc:
 IPv6 Address. . . . . . . . . . . . . . . . . : 3067:cdf0:fc0d:8e69:8a12:9536:f122:d92f
