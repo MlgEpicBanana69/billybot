@@ -12,6 +12,7 @@ import discord
 from discord.ext import commands
 from discord.utils import get
 import asyncio
+from dotenv import dotenv_load
 
 import cv2
 import numpy as np
@@ -446,6 +447,7 @@ Default Gateway . . . . . . . . . . . . . : fe80::384ff:4300:0a77:0d79 :: 192.16
         return None
 #endregion
 
-
-with open("token.txt", "r", encoding="UTF-8") as token_f:
-    BillyBot.run(token_f.read())
+if __name__ == '__main__':
+    env = dotenv_load()
+    with open("token.txt", "r", encoding="UTF-8") as token_f:
+        BillyBot.run(token_f.read())
