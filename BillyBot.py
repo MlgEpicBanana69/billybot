@@ -63,7 +63,7 @@ async def on_message(message):
     # auto-say
     if message.guild is not None:
         if (message.author.id, message.guild.id) in auto_say_members:
-            await message.channel.send(message)
+            await message.channel.send(message.content)
 
         #region Chat responds
         billybot_mention = "<@!" + BillyBot.user.mention[2::]
