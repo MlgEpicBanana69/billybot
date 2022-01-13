@@ -84,7 +84,6 @@ async def on_command_error(ctx, error):
     await ctx.defer()
     match error:
         case isinstance(error, commands.errors.MissingPermissions): await ctx.respond("You do not have the required permission to run this command.")
-        case _: await ctx.respond("Command failed due to unknown error.")
 
 @BillyBot.event
 async def on_guild_join(guild):
@@ -211,7 +210,6 @@ async def play(ctx, source):
 
     # also when multiple sources are given, BillyBot takes only the first one
     # further attachments are *completely* ignored."""
-
     if ctx.author.voice is not None:
         await join(ctx)
         guild_player = bb_media.Player.get_player(ctx.guild)
@@ -265,7 +263,13 @@ async def resume(ctx):
 @BillyBot.slash_command(name="skip")
 async def skip(ctx):
     """Skips to the next song in queue"""
-    bb_media.Player.get_player(ctx.guild).next()
+    guild_player = bb_media.Player.get_player(ctx.guild)
+    guild_player.next()
+    queue = guild_player.get_queue()
+    if len(queue) > 0:
+        await ctx.respond(f"Now playing: {str(queue[0])}")
+    else:
+        await ctx.respond("Queue ended, stopped playing.")
 
 @BillyBot.slash_command(name="shuffle")
 async def shuffle(ctx):
