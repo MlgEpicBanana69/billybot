@@ -174,7 +174,7 @@ async def saytoggle(ctx):
         await ctx.respond("✅ Now ON")
     else:
         auto_say_members.remove((ctx.author.id, ctx.guild.id))
-        await ctx.respond("✅ Now OFF")
+        await ctx.respond("❌ Now OFF")
 #endregion
 
 #region Server managment commands
