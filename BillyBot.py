@@ -60,6 +60,7 @@ async def on_message(message):
     """Handles stuff that need to be handled on every message"""
     print("{0} on {1} -> #{2}: {3}".format(str(message.author), str(message.guild),
                                           str(message.channel), message.content))
+
     # auto-say
     if message.guild is not None:
         if (message.author.id, message.guild.id) in auto_say_members:
@@ -77,7 +78,13 @@ async def on_message(message):
                     await asyncio.sleep(2)
                     await message.channel.send(val)
                     break
-#endregion
+
+@BillyBot.event
+async def on_command_error(ctx, error):
+    await ctx.defer()
+    match error:
+        case isinstance(error, commands.errors.MissingPermissions): await ctx.respond("You do not have the required permission to run this command.")
+        case _: await ctx.respond("Command failed due to unknown error.")
 
 @BillyBot.event
 async def on_guild_join(guild):
