@@ -77,7 +77,7 @@ async def on_message(message):
                     await asyncio.sleep(2)
                     await message.channel.send(val)
                     break
-        #endregion
+#endregion
 
 @BillyBot.event
 async def on_guild_join(guild):

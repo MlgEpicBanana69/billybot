@@ -71,7 +71,7 @@ class Media:
 
         route = None
         if validators.url(self._source):
-            if self._source.startswith("https://www.youtube.com/watch?v="):
+            if self._source.startswith("https://www.youtube.com/watch?v=") or self._source.startswith("https://www.youtu.be/"):
                 route = "youtube_media"
             elif '.' in self._source and '/' in self._source:
                 mimestart = mimetypes.guess_type(urlparse(self._source).path.split('/')[-1])[0]
