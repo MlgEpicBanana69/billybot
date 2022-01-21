@@ -187,14 +187,15 @@ async def doomsday(ctx, day:int, month:int, year:int):
         output = (calc6 - delta_shift) % 7
     await ctx.respond(f"{day}/{month}/{year} is a {days_of_the_week[output]}")
 
-#@BillyBot.slash_command(name="remindme")
-#async def remindme(ctx, seconds=0, minutes=0, hours=0, days=0, weeks=0, months=0, years=0):
-#    """Sets a reminder for <t> time from now"""
-#    now = datetime.datetime().now()
-#    params = [seconds+now.second, minutes+now.minute, hours+now.hour, days+now.day, months+now.month, years+now.year]
-#
-#    time = datetime.timedelta(years+now.year, months+now.month, days+now.day, hours+now.hour, minutes+now.minute, seconds+now.second)
-#    return
+@BillyBot.slash_command(name="remindme")
+async def remindme(ctx, reminder, seconds=0, minutes=0, hours=0, days=0, weeks=0, years=0):
+    """Sets a reminder for <t> time from now
+       years are defined as 365 days"""
+    time = 60*60*24*(years*365 + weeks*7)
+
+    await asyncio.respond(f"BillyBot will remind you to {reminder} in {time}s")
+    await asyncio.sleep(seconds)
+    await ctx.channel.send(f"{ctx.author.mention} You asked me to remind you to: {reminder}")
 
 @BillyBot.slash_command(name="dolev")
 async def dolev(ctx, equation):
