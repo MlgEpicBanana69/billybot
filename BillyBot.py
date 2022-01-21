@@ -55,7 +55,6 @@ async def on_ready():
     await BillyBot.change_presence(status=discord.Status.online)
     print("Logged on as {0}!".format(BillyBot.user))
 
-
 @BillyBot.event
 async def on_message(message):
     """Handles stuff that need to be handled on every message"""
@@ -80,7 +79,6 @@ async def on_message(message):
                     await message.channel.send(val)
                     break
 
-
 @BillyBot.event
 async def on_command_error(ctx, error):
     await ctx.defer()
@@ -90,7 +88,6 @@ async def on_command_error(ctx, error):
         case _:
             await ctx.respond("Command failed to to unknown error")
             raise
-
 
 @BillyBot.event
 async def on_guild_join(guild):
