@@ -1,4 +1,7 @@
+import threading
+import datetime
 import numpy as np
+import asyncio
 
 # https://en.wikipedia.org/wiki/Alpha_compositing
 def merge_pixels(foreground, background):
@@ -29,3 +32,37 @@ def merge_pixels(foreground, background):
                     * background_alpha * (1 - foreground_alpha)) / merged_alpha
     return np.array([int(merged_red * 255), int(merged_green * 255),
                      int(merged_blue * 255), int(merged_alpha * 255)])
+
+#class ScheduledEvent:
+#    time = None
+#    func = None
+#    args = None
+#    cancelled = None
+#    output = None
+#
+#    def __init__(self, time, func, args=[]):
+#        """time is a datetime.datetime (future date) object or an int (time from now in seconds)"""
+#        if type(time) is int:
+#            self.time = datetime.datetime(second=time)
+#        elif type(time) is datetime.datetime:
+#            self.time = time
+#        else:
+#            raise ValueError(f"time cannot be of type {type(time)}, time has to be either int or datetime.datetime")
+#
+#        self.func = func
+#        self.args = args
+#        self.cancelled = False
+#        self.output = None
+#
+#    async def start(self):
+#        miliseconds = 0
+#        while (miliseconds < self.ms_time):
+#            await asyncio.sleep(0.001)
+#            miliseconds += 1
+#            if self.cancelled:
+#                self = None
+#                return
+#        await self.run()
+#
+#    async def run(self):
+#        self.output = await self.func(*self.args)

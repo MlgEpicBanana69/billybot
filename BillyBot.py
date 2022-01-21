@@ -52,7 +52,7 @@ async def on_ready():
     # Generates and binds a player for all of the guilds
     for guild in BillyBot.guilds:
         bb_media.Player(guild, BillyBot)
-    await BillyBot.change_presence(status=discord.Status.online, activity=discord.Game("Pogging rn use ~ for stuff"))
+    await BillyBot.change_presence(status=discord.Status.online)
     print("Logged on as {0}!".format(BillyBot.user))
 
 @BillyBot.event
@@ -83,7 +83,11 @@ async def on_message(message):
 async def on_command_error(ctx, error):
     await ctx.defer()
     match error:
-        case isinstance(error, commands.errors.MissingPermissions): await ctx.respond("You do not have the required permission to run this command.")
+        case isinstance(error, commands.errors.MissingPermissions):
+            await ctx.respond("You do not have the required permission to run this command.")
+        case _:
+            await ctx.respond("Command failed to to unknown error")
+            raise
 
 @BillyBot.event
 async def on_guild_join(guild):
@@ -156,18 +160,50 @@ async def squaretext(ctx, message):
 @BillyBot.slash_command(name="doomsday")
 async def doomsday(ctx, day:int, month:int, year:int):
     """Tells you what day a given date is using the doomsday algorithm"""
-    ctx.defer()
+    await ctx.defer()
     days_of_the_week = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
     centuary_anchors = [5, 3, 2, 0]
     anchor_day = centuary_anchors[(year // 100 - 18) % 4]
+    doomsdays = [3, 28, 7, 4, 9, 6, 11, 8, 5, 10, 7, 12]
+    leap_doomsdays = [4, 29]
+    is_leap_year = (year % 4 == 0 and year % 100 != 0) or (year % 100 == 0 and year % 400 == 0)
 
-    calc1 = (year - year // 100 * 100) // 12
-    calc2 = abs((calc1 * 12) - (year - year // 100 * 100))
-    calc3 = 6 // 4
+    calc1 = (year % 100) // 12
+    calc2 = abs((year % 100) - calc1*12)
+    calc3 = calc2 // 4
     calc4 = anchor_day
     calc5 = calc1 + calc2 + calc3 + calc4
     calc6 = calc5 % 7
-    await ctx.respond(f"{day}/{month}/{year} is a {days_of_the_week[calc6]}")
+
+    if not is_leap_year:
+        closest_doomsday = doomsdays[month-1]
+    else:
+        closest_doomsday = leap_doomsdays[month-1]
+
+    delta_shift = abs(day - closest_doomsday) % 7
+    if closest_doomsday < day:
+        output = (calc6 + delta_shift) % 7
+    else:
+        output = (calc6 - delta_shift) % 7
+    await ctx.respond(f"{day}/{month}/{year} is a {days_of_the_week[output]}")
+
+#@BillyBot.slash_command(name="remindme")
+#async def remindme(ctx, seconds=0, minutes=0, hours=0, days=0, weeks=0, months=0, years=0):
+#    """Sets a reminder for <t> time from now"""
+#    now = datetime.datetime().now()
+#    params = [seconds+now.second, minutes+now.minute, hours+now.hour, days+now.day, months+now.month, years+now.year]
+#
+#    time = datetime.timedelta(years+now.year, months+now.month, days+now.day, hours+now.hour, minutes+now.minute, seconds+now.second)
+#    return
+
+@BillyBot.slash_command(name="dolev")
+async def dolev(ctx, equation):
+    if equation.count("=") == 1:
+        await ctx.defer()
+        await asyncio.sleep(120)
+        await ctx.respond("Dolev gave up")
+    else:
+        await ctx.respond("This is not a valid equation.")
 #endregion
 
 #region Chat toggles
@@ -190,12 +226,9 @@ async def wipe(ctx, n:int):
     """Deletes n meesages from the current text channel"""
     await ctx.defer()
     history = await ctx.channel.history(limit=n+1).flatten()
-    initial_msg = history[0]
     for msg in history[1::]:
         await msg.delete()
-    await ctx.respond(f"Deleted {len(history[1::])} messages.")
-    await asyncio.sleep(5)
-    await initial_msg.delete()
+    await ctx.respond(f"Deleted {len(history[1::])} messages.", delete_after=5)
 #endregion
 
 #region Player commands
