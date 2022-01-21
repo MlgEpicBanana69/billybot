@@ -191,7 +191,7 @@ async def doomsday(ctx, day:int, month:int, year:int):
 async def remindme(ctx, reminder, seconds=0, minutes=0, hours=0, days=0, weeks=0, years=0):
     """Sets a reminder for <t> time from now
        years are defined as 365 days"""
-    time = 60*60*24*(years*365 + weeks*7)
+    time = 60*(60*(24*(years*365 + weeks*7 + days) + minutes) + hours) + seconds
 
     await asyncio.respond(f"BillyBot will remind you to {reminder} in {time}s")
     await asyncio.sleep(seconds)
