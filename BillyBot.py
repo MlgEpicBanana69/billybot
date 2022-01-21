@@ -103,24 +103,14 @@ async def say(ctx, message):
     """Repeats a given message."""
     await ctx.respond(message)
 
-
 @BillyBot.slash_command(name="roll")
-async def roll(ctx, start: int, end=100):
+async def roll(ctx, start: int, end:int=100):
     """ Rolls a number in the given range where both ends are inclusive """
 
     if start > end:
         await ctx.respond("Invalid range!")
-        return
-
-    await ctx.respond("I rolled: {0}!".format(random.randint(start, end)))
-
-
-@roll.error
-async def roll_error(ctx, error):
-    """Handles errors on the roll command"""
-    if isinstance(error, commands.BadArgument):
-        await ctx.respond("Invalid arguments! Follow the command format of: roll {start} {end}")
-
+    else:
+        await ctx.respond("I rolled: {0}!".format(random.randint(start, end)))
 
 @BillyBot.slash_command(name="squaretext")
 async def squaretext(ctx, message):
@@ -163,7 +153,6 @@ async def squaretext(ctx, message):
     else:
         await ctx.respond(content="", file=discord.File(fp=io.StringIO(final_message), filename="squared_text.txt"))
 
-
 @BillyBot.slash_command(name="doomsday")
 async def doomsday(ctx, day: int, month: int, year: int):
     """Tells you what day a given date is using the doomsday algorithm"""
@@ -196,7 +185,6 @@ async def doomsday(ctx, day: int, month: int, year: int):
         output = (calc6 - delta_shift) % 7
     await ctx.respond(f"{day}/{month}/{year} is a {days_of_the_week[output]}")
 
-
 @BillyBot.slash_command(name="remindme")
 async def remindme(ctx, reminder, seconds=0, minutes=0, hours=0, days=0, weeks=0, years=0):
     """Will remind you in <t> time
@@ -206,7 +194,6 @@ async def remindme(ctx, reminder, seconds=0, minutes=0, hours=0, days=0, weeks=0
     await asyncio.respond(f"BillyBot will remind you to {reminder} in {time}s")
     await asyncio.sleep(seconds)
     await ctx.channel.send(f"{ctx.author.mention} You asked me to remind you to: {reminder}")
-
 
 @BillyBot.slash_command(name="dolev")
 async def dolev(ctx, equation):
@@ -286,12 +273,10 @@ async def play(ctx, source):
     else:
         ctx.respond("You're not in any voice channel.")
 
-
 @BillyBot.slash_command(name="stop")
 async def stop(ctx):
     """Stops the music and clears the queue"""
     await bb_media.Player.get_player(ctx.guild).stop()
-
 
 @BillyBot.slash_command(name="pause")
 async def pause(ctx):
@@ -300,14 +285,12 @@ async def pause(ctx):
         await ctx.respond("Now paused.")
         await bb_media.Player.get_player(ctx.guild).pause()
 
-
 @BillyBot.slash_command(name="resume")
 async def resume(ctx):
     """Pauses the current song"""
     if ctx.guild.me.voice.channel == ctx.author.voice.channel and ctx.guild.me.voice is not None:
         await ctx.respond("Resumed.")
         await bb_media.Player.get_player(ctx.guild).resume()
-
 
 @BillyBot.slash_command(name="skip")
 async def skip(ctx):
@@ -320,12 +303,10 @@ async def skip(ctx):
     else:
         await ctx.respond("Queue ended, stopped playing.")
 
-
 @BillyBot.slash_command(name="shuffle")
 async def shuffle(ctx):
     """Shuffles the queue"""
     await bb_media.Player.get_player(ctx.guild).shuffle()
-
 
 @BillyBot.slash_command(name="loop")
 async def loop(ctx):
@@ -334,12 +315,10 @@ async def loop(ctx):
     loop_state = "ON" if loop_state else "OFF"
     await ctx.respond("Loop is now {0}".format(loop_state))
 
-
 @BillyBot.slash_command(name="skipto")
 async def skipto(ctx, position: int):
     """Skips to a position in queue"""
     await bb_media.Player.get_player(ctx.guild).goto(position)
-
 
 @BillyBot.slash_command(name="queue")
 async def queue(ctx):
@@ -368,7 +347,6 @@ async def join(ctx):
         await ctx.guild.me.edit(deafen=True)
     except discord.errors.Forbidden:
         raise  # Silent permission error because the self deafen is purely cosmetic kekW
-
 
 @BillyBot.slash_command(name="leave")
 async def leave(ctx):
@@ -437,7 +415,6 @@ async def cyber(ctx, args=""):
                     pass
         await ctx.respond(content="", file=discord.File(fp=io.BytesIO(cv2.imencode(".png", current_img)[1].tobytes()), filename="outputImage.png"))
 
-
 @BillyBot.slash_command(name="bibi")
 async def bibi(ctx):
     """Sends a picture of Israel's **EX** prime minister Benjamin Netanyahu."""
@@ -488,7 +465,6 @@ async def minesweeper(ctx, width: int, height: int, mines: int):
 async def sus(ctx, user):
     """amogus"""
     await ctx.respond(f"{ctx.author.mention} susses out {user.mention}")
-
 
 @BillyBot.user_command(name="love")
 async def love(ctx, user):
