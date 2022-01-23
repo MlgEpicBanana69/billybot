@@ -13,8 +13,8 @@ token.txt
 .env
 
 # Vscode
-.vs
-.vscode
+*.vs
+*.vscode
 
 # Distribution / packaging
 .Python
