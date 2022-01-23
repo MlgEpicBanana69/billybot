@@ -12,6 +12,10 @@ token.txt
 # Environment file
 .env
 
+# Vscode
+.vs
+.vscode
+
 # Distribution / packaging
 .Python
 build/
