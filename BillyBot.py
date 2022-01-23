@@ -21,6 +21,7 @@ import validators
 import BillyBot_utils as bb_utils
 import BillyBot_games as bb_games
 import BillyBot_media as bb_media
+from BillyBot_osu import BillyBot_osu
 
 # Ideas:
 #   osu statistics display
@@ -43,6 +44,7 @@ auto_say_members = []
 
 discord_token = os.environ.get("discord_token")
 osu_token = os.environ.get("osu_token")
+bb_osu = BillyBot_osu(osu_token)
 
 # region Bot events
 @BillyBot.event
@@ -200,7 +202,21 @@ async def dolev(ctx, equation):
         await ctx.respond("Dolev gave up")
     else:
         await ctx.respond("This is not a valid equation.")
-# endregion
+
+@BillyBot.slash_command(name="bibi")
+async def bibi(ctx):
+    """Sends a picture of Israel's **EX** prime minister Benjamin Netanyahu."""
+    bb_images = os.listdir("resources\\bibi\\")
+    with open("resources\\bibi\\" + random.choice(bb_images), "rb") as bb_pick:
+        await ctx.respond(file=discord.File(fp=bb_pick, filename="bb.png"))
+
+@BillyBot.slash_command(name="ofekganor")
+async def ofekganor(ctx):
+    """Sends a picture of Lord Ofek Ganor in his full glory"""
+    ofek_images = os.listdir("resources\\ofekganor\\")
+    with open("resources\\ofekganor\\" + random.choice(ofek_images), "rb") as ofek_pick:
+        await ctx.respond(file=discord.File(fp=ofek_pick, filename="ofek.png"))
+#endregion
 
 # region Chat toggles
 @BillyBot.slash_command(name="saytoggle")
@@ -412,12 +428,7 @@ async def cyber(ctx, args=""):
                     pass
         await ctx.respond(content="", file=discord.File(fp=io.BytesIO(cv2.imencode(".png", current_img)[1].tobytes()), filename="outputImage.png"))
 
-@BillyBot.slash_command(name="bibi")
-async def bibi(ctx):
-    """Sends a picture of Israel's **EX** prime minister Benjamin Netanyahu."""
-    bb_images = os.listdir("resources\\bibi\\")
-    with open("resources\\bibi\\" + random.choice(bb_images), "rb") as bb_pick:
-        await ctx.respond(file=discord.File(fp=bb_pick, filename="bb.png"))
+
 # endregion
 
 # region Personal management
@@ -502,6 +513,5 @@ Default Gateway . . . . . . . . . . . . . : fe80::384ff:4300:0a77:0d79 :: 192.16
     else:
         return None
 # endregion
-
 
 BillyBot.run(discord_token)
