@@ -498,7 +498,7 @@ async def merge_collections(ctx, *collections):
     await ctx.defer()
     final_collection = bb_osu.merge_collections([bb_osu.read_collection(c) for c in collections])
     file_contents = bb_osu.dump_collection(final_collection)
-    ctx.respond(f"Merged {len(collections)} collections", file=discord.File(contents=file_contents, name="collection.db"))
+    await ctx.respond(f"Merged {len(collections)} collections", file=discord.File(contents=file_contents, name="collection.db"))
 #endregion
 
 #region intimidation responses
