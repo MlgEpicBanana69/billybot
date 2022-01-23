@@ -1,13 +1,7 @@
-"""BillyBot is a general purpose discord bot that barely works"""
-
 import io
-from logging import debug
 import os
 import random
-import datetime
-from urllib.parse import urlparse
 
-import aiohttp
 import discord
 from discord.ext import commands
 from discord.utils import get
@@ -30,6 +24,10 @@ from BillyBot_osu import BillyBot_osu
 #   the ultimate shitpost database
 #   Trade with TamaCrypto (Based!!)
 
+# Discord developer portal
+# https://discord.com/developers/applications/757490339425550336/information
+
+# BillyBot invite url
 # https://discord.com/api/oauth2/authorize?client_id=757490339425550336&permissions=8&scope=applications.commands%20bot
 
 load_dotenv()
@@ -46,7 +44,7 @@ discord_token = os.environ.get("discord_token")
 osu_token = os.environ.get("osu_token")
 bb_osu = BillyBot_osu(osu_token)
 
-# region Bot events
+#region Bot events
 @BillyBot.event
 async def on_ready():
     """Does the initial setup for BillyBot"""
@@ -69,17 +67,18 @@ async def on_message(message):
             await message.channel.send(message.content)
 
         billybot_mention = "<@!" + BillyBot.user.mention[2::]
-        if message.content.startswith(billybot_mention) or message.content.endswith(billybot_mention):
-            keyphrase = message.content.replace(billybot_mention, '').strip()
-            keyphrase = "".join(
-                c for c in keyphrase if c.isalpha() or c == ' ')
-            cyber_intimidation = _cyber_intimidation(message, keyphrase)
-            respond_table = [cyber_intimidation]
-            for val in respond_table:
-                if val is not None:
-                    await asyncio.sleep(2)
-                    await message.channel.send(val)
-                    break
+        if message.author != BillyBot.user:
+            if message.content.startswith(billybot_mention) or message.content.endswith(billybot_mention):
+                keyphrase = message.content.replace(billybot_mention, '').strip()
+                keyphrase = "".join([c for c in keyphrase if c.isalpha() or c == ' '])
+
+                cyber_response = cyber_intimidation(message, keyphrase)
+                respond_table = [cyber_response]
+                for val in respond_table:
+                    if val is not None:
+                        await asyncio.sleep(2)
+                        await message.channel.send(val)
+                        break
 
 @BillyBot.event
 async def on_command_error(ctx, error):
@@ -96,7 +95,7 @@ async def on_guild_join(guild):
     bb_media.Player(guild, BillyBot)
 # endregion
 
-# region Simple commands
+#region Simple commands
 @BillyBot.slash_command(name="say")
 async def say(ctx, message):
     """Repeats a given message."""
@@ -184,15 +183,15 @@ async def doomsday(ctx, day: int, month: int, year: int):
         output = (calc6 - delta_shift) % 7
     await ctx.respond(f"{day}/{month}/{year} is a {days_of_the_week[output]}")
 
-@BillyBot.slash_command(name="remindme")
-async def remindme(ctx, reminder, seconds=0, minutes=0, hours=0, days=0, weeks=0, years=0):
-    """Will remind you in <t> time
-       years are defined as 365 days"""
-    time = 60*(60*(24*(years*365 + weeks*7 + days) + minutes) + hours) + seconds
-
-    await asyncio.respond(f"BillyBot will remind you to {reminder} in {time}s")
-    await asyncio.sleep(seconds)
-    await ctx.channel.send(f"{ctx.author.mention} You asked me to remind you to: {reminder}")
+#@BillyBot.slash_command(name="remindme")
+#async def remindme(ctx, reminder, seconds=0, minutes=0, hours=0, days=0, weeks=0, years=0):
+#    """Will remind you in <t> time
+#       years are defined as 365 days"""
+#    time = 60*(60*(24*(years*365 + weeks*7 + days) + minutes) + hours) + seconds
+#
+#    await asyncio.respond(f"BillyBot will remind you to {reminder} in {time}s")
+#    await asyncio.sleep(seconds)
+#    await ctx.channel.send(f"{ctx.author.mention} You asked me to remind you to: {reminder}")
 
 @BillyBot.slash_command(name="dolev")
 async def dolev(ctx, equation):
@@ -218,7 +217,7 @@ async def ofekganor(ctx):
         await ctx.respond(file=discord.File(fp=ofek_pick, filename="ofek.png"))
 #endregion
 
-# region Chat toggles
+#region Chat toggles
 @BillyBot.slash_command(name="saytoggle")
 async def saytoggle(ctx):
     """Toggles on/off the auto echo function."""
@@ -231,7 +230,7 @@ async def saytoggle(ctx):
         await ctx.respond("❌ Now OFF")
 # endregion
 
-# region Server managment commands
+#region Server managment commands
 @BillyBot.slash_command(name="wipe")
 @commands.has_permissions(manage_messages=True)
 async def wipe(ctx, n: int):
@@ -243,7 +242,7 @@ async def wipe(ctx, n: int):
     await ctx.respond(f"Deleted {len(history[1::])} messages.", delete_after=5)
 # endregion
 
-# region Player commands
+#region Player commands
 @BillyBot.slash_command(name="play")
 async def play(ctx, source):
     """Plays audio from an audio source
@@ -345,7 +344,7 @@ async def queue(ctx):
         await ctx.respond("I am not playing anything right now!")
 # endregion
 
-# region Voice commands
+#region Voice commands
 @BillyBot.slash_command(name="join")
 async def join(ctx):
     """Joins into your voice channel."""
@@ -373,7 +372,7 @@ async def leave(ctx):
         await ctx.respond("I'm not in a voice channel! Use /join to make me join one.")
 # endregion
 
-# region Processing commands
+#region Processing commands
 @BillyBot.slash_command(name="cyber")
 async def cyber(ctx, args=""):
     """Overlays the text סייבר on a given image."""
@@ -431,14 +430,14 @@ async def cyber(ctx, args=""):
 
 # endregion
 
-# region Personal management
+#region Personal management
 @BillyBot.slash_command(name="remindme")
 async def remindme(ctx, reminder: str, seconds: int):
     """Not implemented"""
     raise NotImplementedError
 # endregion
 
-# region gaming
+#region gaming
 @BillyBot.slash_command(name="minesweeper")
 async def minesweeper(ctx, width: int, height: int, mines: int):
     """Play minesweeper, powered by BillyBot™"""
@@ -468,7 +467,7 @@ async def minesweeper(ctx, width: int, height: int, mines: int):
         await ctx.respond("Board contents too long (more than 2000 characters)! Try making a smaller board...")
 # endregion
 
-# region Tag user commands
+#region Tag user commands
 @BillyBot.user_command(name="sus")
 async def sus(ctx, user):
     """amogus"""
@@ -480,7 +479,7 @@ async def love(ctx, user):
     await ctx.respond(f"{ctx.author.mention} ❤️ {user.mention} 🥰")
 # endregion
 
-# region Helper functions
+#region Helper functions
 def _all_ctx_sources(ctx, args):
     "Returns a of all file sources from given ctx + args"
     output = []
@@ -493,8 +492,17 @@ def _all_ctx_sources(ctx, args):
     return output
 # endregion
 
-# region intimidation responses
-def _cyber_intimidation(message, keyphrase):
+#region osu commands
+@BillyBot.slash_command(name="mergecollection")
+async def merge_collections(ctx, *collections):
+    await ctx.defer()
+    final_collection = bb_osu.merge_collections([bb_osu.read_collection(c) for c in collections])
+    file_contents = bb_osu.dump_collection(final_collection)
+    ctx.respond(f"Merged {len(collections)} collections", file=discord.File(contents=file_contents, name="collection.db"))
+#endregion
+
+#region intimidation responses
+def cyber_intimidation(message, keyphrase):
     insults = None
     with open("resources/billy_insults.txt", mode="r", encoding='utf-8') as f:
         insults = f.read().split('\n')
