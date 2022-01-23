@@ -22,7 +22,7 @@ import validators
 import BillyBot_utils as bb_utils
 import BillyBot_games as bb_games
 import BillyBot_media as bb_media
-import BillyBot_osu   as bb_osu
+from BillyBot_osu import BillyBot_osu
 
 # Ideas:
 #   osu statistics display
@@ -45,6 +45,7 @@ auto_say_members = []
 
 discord_token = os.environ.get("discord_token")
 osu_token = os.environ.get("osu_token")
+bb_osu = BillyBot_osu(osu_token)
 
 #region Bot events
 @BillyBot.event
@@ -165,7 +166,53 @@ async def doomsday(ctx, day:int, month:int, year:int):
     await ctx.respond(f"{day}/{month}/{year} is a {days_of_the_week[calc6]}")
 #endregion
 
-#region Chat toggles
+    if not is_leap_year:
+        closest_doomsday = doomsdays[month-1]
+    else:
+        closest_doomsday = leap_doomsdays[month-1]
+
+    delta_shift = abs(day - closest_doomsday) % 7
+    if closest_doomsday < day:
+        output = (calc6 + delta_shift) % 7
+    else:
+        output = (calc6 - delta_shift) % 7
+    await ctx.respond(f"{day}/{month}/{year} is a {days_of_the_week[output]}")
+
+@BillyBot.slash_command(name="remindme")
+async def remindme(ctx, reminder, seconds=0, minutes=0, hours=0, days=0, weeks=0, years=0):
+    """Will remind you in <t> time
+       years are defined as 365 days"""
+    time = 60*(60*(24*(years*365 + weeks*7 + days) + minutes) + hours) + seconds
+
+    await asyncio.respond(f"BillyBot will remind you to {reminder} in {time}s")
+    await asyncio.sleep(seconds)
+    await ctx.channel.send(f"{ctx.author.mention} You asked me to remind you to: {reminder}")
+
+@BillyBot.slash_command(name="dolev")
+async def dolev(ctx, equation):
+    if equation.count("=") == 1:
+        await ctx.defer()
+        await asyncio.sleep(120)
+        await ctx.respond("Dolev gave up")
+    else:
+        await ctx.respond("This is not a valid equation.")
+
+@BillyBot.slash_command(name="bibi")
+async def bibi(ctx):
+    """Sends a picture of Israel's **EX** prime minister Benjamin Netanyahu."""
+    bb_images = os.listdir("resources\\bibi\\")
+    with open("resources\\bibi\\" + random.choice(bb_images), "rb") as bb_pick:
+        await ctx.respond(file=discord.File(fp=bb_pick, filename="bb.png"))
+
+@BillyBot.slash_command(name="ofekganor")
+async def ofekganor(ctx):
+    """Sends a picture of Lord Ofek Ganor in his full glory"""
+    ofek_images = os.listdir("resources\\ofekganor\\")
+    with open("resources\\ofekganor\\" + random.choice(ofek_images), "rb") as ofek_pick:
+        await ctx.respond(file=discord.File(fp=ofek_pick, filename="ofek.png"))
+#endregion
+
+# region Chat toggles
 @BillyBot.slash_command(name="saytoggle")
 async def saytoggle(ctx):
     """Toggles on/off the auto echo function."""
@@ -364,13 +411,8 @@ async def cyber(ctx, args=""):
                     pass
         await ctx.respond(content="", file=discord.File(fp=io.BytesIO(cv2.imencode(".png", current_img)[1].tobytes()), filename="outputImage.png"))
 
-@BillyBot.slash_command(name="bibi")
-async def bibi(ctx):
-    """Sends a picture of Israel's **EX** prime minister Benjamin Netanyahu."""
-    bb_images = os.listdir("resources\\bibi\\")
-    with open("resources\\bibi\\" + random.choice(bb_images), "rb") as bb_pick:
-        await ctx.respond(file=discord.File(fp=bb_pick, filename="bb.png"))
-#endregion
+
+# endregion
 
 #region Personal management
 @BillyBot.slash_command(name="remindme")
@@ -452,6 +494,6 @@ Default Gateway . . . . . . . . . . . . . : fe80::384ff:4300:0a77:0d79 :: 192.16
 {repr(message.author)}"""
     else:
         return None
-#endregion
+# endregion
 
 BillyBot.run(discord_token)
