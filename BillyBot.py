@@ -21,6 +21,7 @@ import validators
 import BillyBot_utils as bb_utils
 import BillyBot_games as bb_games
 import BillyBot_media as bb_media
+import BillyBot_osu   as bb_osu
 
 # Ideas:
 #   osu statistics display
