@@ -1,15 +1,9 @@
-try:
-    import os
-    import json
-    import requests
-    import browser_cookie3
-    import re
-    from winreg import HKEY_CURRENT_USER, OpenKey, QueryValueEx
-except ModuleNotFoundError as err:
-    print("Import error has occoured, please contact me :(")
-    print(err)
-    input("<Press any key to continue...>")
-    raise err
+import os
+import json
+import requests
+import browser_cookie3
+import re
+from winreg import HKEY_CURRENT_USER, OpenKey, QueryValueEx
 
 class BillyBot_osu:
     api_key = None
