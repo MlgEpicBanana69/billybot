@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 
 import aiohttp
 import discord
+from discord.components import C
 from discord.ext import commands
 from discord.utils import get
 import asyncio
