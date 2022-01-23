@@ -8,9 +8,8 @@ __pycache__/
 
 # Token file
 token.txt
-# Test file
-temp.txt
 
+# Environment file
 .env
 
 # Distribution / packaging
