@@ -1,9 +1,15 @@
-import os
-import json
-import requests
-import browser_cookie3
-import re
-from winreg import HKEY_CURRENT_USER, OpenKey, QueryValueEx
+try:
+    import os
+    import json
+    import requests
+    import browser_cookie3
+    import re
+    from winreg import HKEY_CURRENT_USER, OpenKey, QueryValueEx
+except ModuleNotFoundError as err:
+    print("Import error has occoured, please contact me :(")
+    print(err)
+    input("<Press any key to continue...>")
+    raise err
 
 SELF_PATH = os.path.dirname(os.path.realpath(__file__))
 COMMON_OSU_PATHS = ["C:\\Program Files\\osu!", "D:\\Program Files\\osu!", "O:\\Program Files\\osu!"]
@@ -17,11 +23,14 @@ OSU_BEATMAPSET_URL = "https://osu.ppy.sh/beatmapsets"
 browser_reg_path = r'Software\Microsoft\Windows\Shell\Associations\UrlAssociations\https\UserChoice'
 
 def get_browser_cookies():
+
+
     with OpenKey(HKEY_CURRENT_USER, browser_reg_path) as key:
         browser_key = QueryValueEx(key, "ProgId")[0]
 
     # Chrome
     if browser_key == "ChromeHTML":
+        #return browser_cookie3.chrome(cookie_file=r"C:\Users\MlgEp\AppData\Local\Google\Chrome\User Data\Profile 10\Cookies")
         return browser_cookie3.chrome()
     # Firefox
     elif browser_key == "FirefoxURL-308046B0AF4A39CB":
