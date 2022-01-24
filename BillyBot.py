@@ -493,9 +493,9 @@ def _all_ctx_sources(ctx, args):
 # endregion
 
 #region osu commands
-@BillyBot.slash_command(name="mergeOsuCollections")
+@BillyBot.slash_command(name="mergeosucollections")
 async def merge_osu_collections(ctx, collections):
-    """Merges given osu collection.db files together"""
+    """Merges the given osu collection.db files together"""
     await ctx.defer()
     collections = [bb_media.Static(collection)() for collection in collections.split()]
     final_collection = bb_osu.merge_collections(*[bb_osu.read_collection(collection_db) for collection_db in collections])
