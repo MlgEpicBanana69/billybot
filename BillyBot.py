@@ -494,11 +494,13 @@ def _all_ctx_sources(ctx, args):
 
 #region osu commands
 @BillyBot.slash_command(name="mergecollection")
-async def merge_collections(ctx, *collections):
+async def merge_collections(ctx, collections):
+    """Merges the given osu collections together"""
     await ctx.defer()
-    final_collection = bb_osu.merge_collections([bb_osu.read_collection(c) for c in collections])
+    collections = [bb_media.Static(collection)() for collection in collections.split()]
+    final_collection = bb_osu.merge_collections(*[bb_osu.read_collection(collection_db) for collection_db in collections])
     file_contents = bb_osu.dump_collection(final_collection)
-    await ctx.respond(f"Merged {len(collections)} collections", file=discord.File(contents=file_contents, name="collection.db"))
+    await ctx.respond(f"Merged {len(collections)} collections", file=discord.File(fp=io.BytesIO(file_contents), filename="collection.db"))
 #endregion
 
 #region intimidation responses

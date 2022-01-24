@@ -14,6 +14,7 @@ class Media:
     _name = None
     _content = None
     _source = None
+    # generic_file, generic_video, generic_audio, youtube_media
     _route_type = None
 
     def __init__(self, source):
@@ -78,6 +79,8 @@ class Media:
                 if mimestart is not None:
                     if mimestart.split('/')[0] in ['video', 'audio', 'image']:
                         route = "generic_" + mimestart.split('/')[0]
+                elif len(urlparse(self._source).path.split('/')[-1].split('.')) == 2:
+                    route = "generic_file"
         self._route_type = route
 
     def fetch_file(self):
@@ -108,6 +111,7 @@ class Streamable(Media):
 
     def __init__(self, source):
         super().__init__(source)
+        assert self._route_type in ['generic_video', 'generic_audio', 'youtube_media']
         self.generate_stream()
 
     def __call__(self):

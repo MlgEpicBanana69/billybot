@@ -1,5 +1,6 @@
 import os
 import json
+from typing import final
 import requests
 import browser_cookie3
 import re
@@ -22,58 +23,58 @@ class BillyBot_osu:
     #region collection management
     def merge_collections(self, *collections):
         """merges n collections together"""
+        collections = list(collections)
         if len(collections) == 1:
             return collections[0]
         collection_A = collections.pop()
         collection_B = collections.pop()
-        final_collection = {}
-        title_sum = list(set(collection_A + collection_B))
+        final_collection = {'': [collection_A[''], collection_B['']]}
+        #assert len(final_collection['']) == 1
+        title_sum = list(dict.fromkeys(list(collection_A.keys()) + list(collection_B.keys())))
         title_sum.sort()
         for title in title_sum:
-            final_collection[title] = []
-            if title in collection_A.keys():
-                final_collection[title] += collection_A[title]
-            if title in collection_B.keys():
-                final_collection[title] += collection_B[title]
-            final_collection[title].sort()
+            if title != '':
+                final_collection[title] = []
+                if title in collection_A.keys():
+                    final_collection[title] += collection_A[title]
+                if title in collection_B.keys():
+                    final_collection[title] += collection_B[title]
+            final_collection[title] = list(dict.fromkeys(final_collection[title]))
+        final_collection[''] = final_collection[''][-1]
         collections.append(final_collection)
-        return self.merge_collections(collections)
+        return self.merge_collections(*collections)
 
     def dump_collection(self, collection):
         """Converts json collection to binary collection file contents"""
         collections_count = len(collection)-1
-        encode_number = lambda n: b"".join([chr((n // 255**i) % 255).encode() for i in range(4)])
+        encode_number = lambda n: b"".join([chr((n // 256**i) % 256).encode('latin1') for i in range(4)])
         version = collection['']
         output = version.encode()
         output += encode_number(collections_count)
         output += b"\x0b"
-        for i, title in enumerate(filter(len, collection.keys())):
-            output += chr(len(title)).encode()
-            output += title.encode()
-            output += encode_number(len(collection[title]))
-            for beatmap in collection[title]:
-                output += b"\x0b "
-                output += beatmap.encode()
-            if i < len(collection.keys())-2:
-                output += b"\x0b"
+        for i, title in enumerate(collection.keys()):
+            if title != '':
+                output += chr(len(title)).encode()
+                output += title.encode()
+                output += encode_number(len(collection[title]))
+                for beatmap in collection[title]:
+                    output += b"\x0b "
+                    output += beatmap.encode()
+                if i < len(collection.keys())-2:
+                    output += b"\x0b"
         return output
 
     def read_collection(self, collection_db):
         """Parses a collection.db file formatted binaries to json"""
         output = {}
         version = collection_db[:4:]
-        collections_count = 0
-        collections_count_binary = collection_db[4:8:]
-        for i, v in enumerate(collections_count_binary[::-1]):
-            collections_count += 256 ** (len(collections_count_binary)-i-1) * v
+        decode_number = lambda x: sum([(b*256**i)for i, b in enumerate(x)])
+        collections_count = decode_number(collection_db[4:8:])
         collection_db = collection_db[9::]
         index = 0
         for collection in range(collections_count):
             title = collection_db[index+1:collection_db[index]+index+1].decode()
-            collection_size = 0
-            collection_size_binary = collection_db[index+len(title)+1:index+len(title)+5:]
-            for i, v in enumerate(collection_size_binary[::-1]):
-                collection_size += 256 ** (len(collection_size_binary)-i-1) * v
+            collection_size = decode_number(collection_db[index+len(title)+1:index+len(title)+5:])
             output[title] = []
             index += 1 + len(title) + 5
             for beatmap in range(collection_size):
@@ -187,3 +188,10 @@ class BillyBot_osu:
         term = term.replace(':', '-')
 
         return term
+
+if __name__ == '__main__':
+    osu = BillyBot_osu("")
+    with open("O:\\osu!\\collection.db", "rb") as f:
+        contents = f.read()
+    coll = osu.read_collection(contents)
+    coll
