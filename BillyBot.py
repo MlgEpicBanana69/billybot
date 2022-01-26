@@ -307,6 +307,7 @@ async def resume(ctx):
 @BillyBot.slash_command(name="skip")
 async def skip(ctx):
     """Skips to the next song in queue"""
+    await ctx.respond("Skipped")
     guild_player = bb_media.Player.get_player(ctx.guild)
     guild_player.next()
     queue = guild_player.get_queue()
@@ -368,6 +369,7 @@ async def leave(ctx):
     if ctx.guild.voice_client is not None:
         await ctx.guild.voice_client.disconnect()
         await bb_media.Player.get_player(ctx.guild).wipe()
+        await ctx.respond("Bye bye", delete_after=5)
     else:
         await ctx.respond("I'm not in a voice channel! Use /join to make me join one.")
 # endregion
