@@ -445,18 +445,15 @@ async def minesweeper(ctx, width: int, height: int, mines: int):
     """Play minesweeper, powered by BillyBot™"""
 
     # Criterias for a valid game
+    valid_game = True
     try:
-        width = int(width)
-        height = int(height)
-        mines = int(mines)
-
         assert width * height <= 100 and width * height > 9
         assert width >= 3 and height >= 3
         assert mines >= 0
         assert width * height - 9 <= mines
         assert width <= 20
-        valid_game = True
-    except (ValueError, AssertionError):
+    except AssertionError as err:
+        print("Failed to generate minesweeper game: " + err.args)
         valid_game = False
 
     if not valid_game:
