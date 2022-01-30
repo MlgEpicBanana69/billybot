@@ -2,16 +2,6 @@ import random
 
 class Minesweeper:
     """BillyBot's gateway to everything minesweeper"""
-
-    _game_tile_map = {}
-    _width = None
-    _height = None
-    _mines = None
-
-    _starting_choice = None
-    _forbidden_mine_tiles = []
-    _used_tiles = []
-
     def _column_of_tile(self, tile):
         return int((tile - 1) % self._width)
 
@@ -56,10 +46,16 @@ class Minesweeper:
         self._height = height
         self._mines = mines
 
+        self._game_tile_map = None
+        self._starting_choice = None
+        self._forbidden_mine_tiles = None
+        self._used_tiles = None
+
     def generate(self):
         self._starting_choice = random.randint(1, self._width*self._height)
         self._forbidden_mine_tiles = []
         self._used_tiles = []
+        self._game_tile_map = {}
 
         self._forbidden_mine_tiles.append(self._starting_choice)
         for neighboring_tile in self._get_neighboring_tiles(self._starting_choice):
@@ -95,28 +91,18 @@ class Minesweeper:
             if not final_tile in self._forbidden_mine_tiles:
                 output_message += "||"
 
-            if self._game_tile_map[final_tile] == -1:
-                output_message += ":boom:"
-            elif self._game_tile_map[final_tile] == 0:
-                output_message += ":zero:"
-            elif self._game_tile_map[final_tile] == 1:
-                output_message += ":one:"
-            elif self._game_tile_map[final_tile] == 2:
-                output_message += ":two:"
-            elif self._game_tile_map[final_tile] == 3:
-                output_message += ":three:"
-            elif self._game_tile_map[final_tile] == 4:
-                output_message += ":four:"
-            elif self._game_tile_map[final_tile] == 5:
-                output_message += ":five:"
-            elif self._game_tile_map[final_tile] == 6:
-                output_message += ":six:"
-            elif self._game_tile_map[final_tile] == 7:
-                output_message += ":seven:"
-            elif self._game_tile_map[final_tile] == 8:
-                output_message += ":eight:"
-            elif self._game_tile_map[final_tile] == 9:
-                output_message += ":nine:"
+            match self._game_tile_map[final_tile]:
+                case -1: output_message += ":boom:"
+                case  0: output_message += ":zero:"
+                case  1: output_message += ":one:"
+                case  2: output_message += ":two:"
+                case  3: output_message += ":three:"
+                case  4: output_message += ":four:"
+                case  5: output_message += ":five:"
+                case  6: output_message += ":six:"
+                case  7: output_message += ":seven:"
+                case  8: output_message += ":eight:"
+                case  9: output_message += ":nine:"
 
             if not final_tile in self._forbidden_mine_tiles:
                 output_message += "||"

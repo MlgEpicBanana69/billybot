@@ -11,13 +11,11 @@ import discord
 from discord.utils import get
 
 class Media:
-    _name = None
-    _content = None
-    _source = None
-    # generic_file, generic_video, generic_audio, youtube_media
-    _route_type = None
-
     def __init__(self, source):
+        self._name = None
+        self._content = None
+        # generic_file, generic_video, generic_audio, youtube_media
+        self._route_type = None
         self._source = source
         self.source_route()
         assert self._route_type is not None
@@ -86,7 +84,6 @@ class Media:
     def fetch_file(self):
         # 100MB
         size_limit = 104857600
-
         resp = requests.get(self._source, stream=True)
         resp.raise_for_status()
         if len(resp.content) > size_limit:
@@ -106,11 +103,10 @@ class Media:
         return self._route_type
 
 class Streamable(Media):
-    # One time use discord streamable stream object
-    _stream = None
-
     def __init__(self, source):
         super().__init__(source)
+        # One time use discord streamable stream object
+        self._stream = None
         assert self._route_type in ['generic_video', 'generic_audio', 'youtube_media']
         self.generate_stream()
 

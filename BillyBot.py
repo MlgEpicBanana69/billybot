@@ -448,15 +448,20 @@ async def minesweeper(ctx, width: int, height: int, mines: int):
         height = int(height)
         mines = int(mines)
 
-        valid_game = not(width * height > 100 or width >= 38 or width <=
-                         3 or height <= 3 or mines <= 0 or width * height - 9 <= mines)
-    except ValueError:
+        assert width * height <= 100 and width * height > 9
+        assert width >= 3 and height >= 3
+        assert mines >= 0
+        assert width * height - 9 <= mines
+        assert width <= 20
+        valid_game = True
+    except (ValueError, AssertionError):
         valid_game = False
 
     if not valid_game:
         await ctx.respond("Invalid paramenters!")
         return
 
+    await ctx.defer()
     minesweeper_game = bb_games.Minesweeper(width, height, mines)
     minesweeper_game.generate()
     minesweeper_message = str(minesweeper_game)
