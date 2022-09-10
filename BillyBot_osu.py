@@ -7,8 +7,6 @@ import re
 from winreg import HKEY_CURRENT_USER, OpenKey, QueryValueEx
 
 class BillyBot_osu:
-    api_key = None
-
     def __init__(self, api_key:str):
         self.OSU_URL = "https://osu.ppy.sh/home"
         self.OSU_SESSION_URL = "https://osu.ppy.sh/session"
