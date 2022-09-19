@@ -204,6 +204,13 @@ async def ofekganor(ctx):
     ofek_images = os.listdir("resources\\ofekganor\\")
     with open("resources\\ofekganor\\" + random.choice(ofek_images), "rb") as ofek_pick:
         await ctx.respond(file=discord.File(fp=ofek_pick, filename="ofek.png"))
+
+@BillyBot.slash_command(name="aranara")
+async def aranara(ctx):
+    """Sends a picture of an aranara"""
+    aranara_images = os.listdir("resources\\aranara\\")
+    with open("resources\\aranara\\" + random.choice(aranara_images), "rb") as aranara_pick:
+        await ctx.respond(file=discord.File(fp=aranara_pick, filename="aranara.png"))
 #endregion
 
 #region Chat toggles
@@ -278,6 +285,7 @@ async def play(ctx, source):
 async def stop(ctx):
     """Stops the music and clears the queue"""
     await bb_media.Player.get_player(ctx.guild).stop()
+    await ctx.respond("Player stopped.")
 
 @BillyBot.slash_command(name="pause")
 async def pause(ctx):
@@ -499,6 +507,19 @@ async def merge_osu_collections(ctx, collections):
     final_collection = bb_osu.merge_collections(*[bb_osu.read_collection(collection_db) for collection_db in collections])
     file_contents = bb_osu.dump_collection(final_collection)
     await ctx.respond(f"Merged {len(collections)} collections", file=discord.File(fp=io.BytesIO(file_contents), filename="collection.db"))
+
+@BillyBot.slash_command(name="glorydays")
+async def glory_days(ctx, language:str="en"):
+    copypastas = {
+                    "en": "To seek the Glory Days 🌅 We’ll fight the lion’s way 🦁 Then let the rain wash 🌧 All of our pride away 😇 So if this victory 🏆 Is our last odyssey 🚗 Then let the POWER within us decide! 💪",
+                    "he": "לחפש אחרי ימי התהילה 🌅 נלחם בדרך האריה 🦁 ואז נתן לגשם לשטוף 🌧️ את כל גאוותנו 😇 אז אם הניצחון הזה 🏆 הוא המסע הקשה האחרון שלנו 🚗 אז תן לכוח שבתוכנו להחליט 💪",
+                    "sp": "Para buscar los Gloriosos Días 🌅 Lucharemos como los leones 🦁 Y deja que la lluvia lave 🌧️ Todo nuestro orgullo 😇 Así que si está victoria 🏆 Es nuestra última odisea 🚗 Entonces deja que el PODER dentro de nosotros decida! 💪",
+                    "jp": "栄光の日々を求めるために🌅 我々は獅子の道を戦います🦁 そして雨が洗い流します🌧 我々のプライドのすべてを洗い流します 😇 もしこの勝利が我々の最後のオデッセイであるなら 🚗 それなら我々の中にあるパワーに決めさせてください! 💪",
+                    "ru": "Щоб шукати днів слави🌅 Ми будемо битися на шляху лева 🦁 Потім нехай дощ змиє🌧 Всю нашу гордість😇 Тож якщо ця перемога 🏆 наша остання одіссея 🚗 Тоді нехай СИЛА всередині нас вирішить!",
+                    "ge": "Um die glorreichen Tage zu suchen 🌅 Wir werden auf dem Weg des Löwen kämpfen 🦁 Dann lassen wir den Regen wegspülen 🌧 All unser Stolz ist dahin 😇 Also, wenn dieser Sieg 🏆 unsere letzte Odyssee ist 🚗 Dann lass die KRAFT in uns entscheiden!",
+                    "du": "Om de gloriedagen te zoeken 🌅 We zullen vechten op de manier van de leeuw 🦁 Laat de regen dan wegspoelen 🌧 Al onze trots weg 😇 Dus als deze overwinning 🏆 onze laatste odyssee is 🚗 Laat dan de KRACHT in ons beslissen!",
+                 }
+    await ctx.respond(copypastas[language])
 #endregion
 
 #region intimidation responses
