@@ -65,10 +65,9 @@ async def on_message(message):
         if (message.author.id, message.guild.id) in auto_say_members:
             await message.channel.send(message.content)
 
-        billybot_mention = "<@!" + BillyBot.user.mention[2::]
         if message.author != BillyBot.user:
-            if message.content.startswith(billybot_mention) or message.content.endswith(billybot_mention):
-                keyphrase = message.content.replace(billybot_mention, '').strip()
+            if message.content.startswith(BillyBot.user.mention) or message.content.endswith(BillyBot.user.mention):
+                keyphrase = message.content.replace(BillyBot.user.mention, '').strip()
                 keyphrase = "".join([c for c in keyphrase if c.isalpha() or c == ' '])
 
                 cyber_response = cyber_intimidation(message, keyphrase)
