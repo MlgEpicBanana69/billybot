@@ -22,7 +22,6 @@ from BillyBot_osu import BillyBot_osu
 #   ghost ping logging
 #   server managment commands
 #   the ultimate shitpost database
-#   Trade with TamaCrypto (Based!!)
 
 # Discord developer portal
 # https://discord.com/developers/applications/757490339425550336/information
@@ -182,16 +181,6 @@ async def doomsday(ctx, day: int, month: int, year: int):
     else:
         output = (calc6 - delta_shift) % 7
     await ctx.respond(f"{day}/{month}/{year} is a {days_of_the_week[output]}")
-
-#@BillyBot.slash_command(name="remindme")
-#async def remindme(ctx, reminder, seconds=0, minutes=0, hours=0, days=0, weeks=0, years=0):
-#    """Will remind you in <t> time
-#       years are defined as 365 days"""
-#    time = 60*(60*(24*(years*365 + weeks*7 + days) + minutes) + hours) + seconds
-#
-#    await asyncio.respond(f"BillyBot will remind you to {reminder} in {time}s")
-#    await asyncio.sleep(seconds)
-#    await ctx.channel.send(f"{ctx.author.mention} You asked me to remind you to: {reminder}")
 
 @BillyBot.slash_command(name="dolev")
 async def dolev(ctx, equation):
@@ -434,9 +423,14 @@ async def cyber(ctx, args=""):
 
 #region Personal management
 @BillyBot.slash_command(name="remindme")
-async def remindme(ctx, reminder: str, seconds: int):
-    """Not implemented"""
-    raise NotImplementedError
+async def remindme(ctx, reminder, seconds:int=0, minutes:int=0, hours:int=0, days:int=0, weeks:int=0, years:int=0):
+    """Will remind you in <t> time
+       years are defined as 365 days"""
+    time = 60*(60*(24*(years*365 + weeks*7 + days) + hours) + minutes) + seconds
+
+    await ctx.respond(f"BillyBot will remind you to {reminder} in {time}s")
+    await asyncio.sleep(time)
+    await ctx.channel.send(f"{ctx.author.mention} You asked me to remind you to: {reminder}")
 # endregion
 
 #region gaming
@@ -450,10 +444,10 @@ async def minesweeper(ctx, width: int, height: int, mines: int):
         assert width * height <= 100 and width * height > 9
         assert width >= 3 and height >= 3
         assert mines >= 0
-        assert width * height - 9 <= mines
+        assert mines <= width * height - 9
         assert width <= 20
     except AssertionError as err:
-        print("Failed to generate minesweeper game: " + err.args)
+        print("Failed to generate minesweeper game: " + err.args[0])
         valid_game = False
 
     if not valid_game:
