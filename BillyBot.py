@@ -209,7 +209,7 @@ async def aranara(ctx):
     """Sends a picture of an aranara"""
     aranara_images = os.listdir("resources\\aranara\\")
     with open("resources\\aranara\\" + random.choice(aranara_images), "rb") as aranara_pick:
-        await ctx.respond(file=discord.File(fp=aranara_pick, filename="aranara.png"))
+        await ctx.respond(file=discord.File(fp=aranara_pick, filename=aranara_pick))
 #endregion
 
 #region Chat toggles
