@@ -208,8 +208,9 @@ async def ofekganor(ctx):
 async def aranara(ctx):
     """Sends a picture of an aranara"""
     aranara_images = os.listdir("resources\\aranara\\")
-    with open("resources\\aranara\\" + random.choice(aranara_images), "rb") as aranara_pick:
-        await ctx.respond(file=discord.File(fp=aranara_pick, filename=aranara_pick))
+    aranara_choice_name = random.choice(aranara_images)
+    with open("resources\\aranara\\" + aranara_choice_name, "rb") as aranara_pick:
+        await ctx.respond(file=discord.File(fp=aranara_pick, filename=aranara_choice_name))
 #endregion
 
 #region Chat toggles
