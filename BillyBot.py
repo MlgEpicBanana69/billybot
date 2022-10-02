@@ -100,7 +100,7 @@ async def say(ctx, message):
     await ctx.respond(message)
 
 @BillyBot.slash_command(name="roll")
-async def roll(ctx, start: int, end:int=100):
+async def roll(ctx, end:int=100, start:int=1):
     """ Rolls a number in the given range where both ends are inclusive """
 
     if start > end:
