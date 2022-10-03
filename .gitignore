@@ -8,6 +8,7 @@ __pycache__/
 
 # vim backup files
 *~
+*.swp
 
 # Token file
 token.txt
