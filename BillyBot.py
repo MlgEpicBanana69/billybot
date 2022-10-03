@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 import cv2
 import numpy as np
 import validators
+import mysql.connector
 
 import BillyBot_utils as bb_utils
 import BillyBot_games as bb_games
@@ -41,7 +42,12 @@ auto_say_members = []
 
 discord_token = os.environ.get("discord_token")
 osu_token = os.environ.get("osu_token")
+sql_pw = os.environ.get("sql_pw")
 bb_osu = BillyBot_osu(osu_token)
+
+# Connect to the shitposting database
+sql_connection = mysql.connector.connect(user="light", password=sql_pw, host="127.0.0.1", database="shitposting_db")
+sql_cursor = sql_connection.cursor()
 
 #region Bot events
 @BillyBot.event
@@ -51,6 +57,8 @@ async def on_ready():
     # Generates and binds a player for all of the guilds
     for guild in BillyBot.guilds:
         bb_media.Player(guild, BillyBot)
+
+    # Log and wait for bot to be online
     await BillyBot.change_presence(status=discord.Status.online)
     print("Logged on as {0}!".format(BillyBot.user))
 
@@ -520,6 +528,41 @@ async def glory_days(ctx, language:str="en"):
                     "du": "Om de gloriedagen te zoeken 🌅 We zullen vechten op de manier van de leeuw 🦁 Laat de regen dan wegspoelen 🌧 Al onze trots weg 😇 Dus als deze overwinning 🏆 onze laatste odyssee is 🚗 Laat dan de KRACHT in ons beslissen!",
                  }
     await ctx.respond(copypastas[language])
+#endregion
+
+#region shitposting
+@BillyBot.slash_command(name="sp_add_user")
+async def sp_add_user(ctx, discord_user:str, privilege_name:str):
+    """
+    Adds a discord user into the shitposting database.
+    """
+    discord_user = str(discord_user)
+    discord_users = dict([(member.mention, member.id) for member in ctx.guild.members])
+    if discord_user not in discord_users.keys():
+        ctx.respond("Invalid discord user")
+        return
+    discord_user = discord_users[discord_user]
+    sql_cursor.execute(f"SELECT privilege_name FROM users_tbl WHERE discord_user_id={ctx.author.id};")
+    try:
+        author_privilege = [priv for priv in sql_cursor]
+        assert len(author_privilege) == 1
+        author_privilege = author_privilege[0][0]
+        sql_cursor.execute(f"SELECT administrator FROM user_privileges_tbl WHERE name=\"owner\";")
+        author_is_admin = [adm for adm in sql_cursor]
+        assert len(author_is_admin) == 1
+        assert author_is_admin[0][0] == 1
+    except AssertionError:
+        await ctx.respond("Insufficient user privilege")
+        return
+
+    sql_cursor.execute("SELECT name FROM user_privileges_tbl;")
+    privilege_names = [priv_name for subl in sql_cursor for priv_name in subl]
+    if privilege_name not in privilege_names:
+        await ctx.respond("Invalid privilege name. See list of valid permissions:\n\n" + "\n".join(privilege_names))
+        return
+
+    sql_cursor.execute(f"INSERT INTO users_tbl (discord_user_id, privilege_name) VALUES ({discord_user}, {privilege_name});")
+    await ctx.respond("Completed action")
 #endregion
 
 #region intimidation responses

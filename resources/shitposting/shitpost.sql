@@ -8,7 +8,6 @@ CREATE TABLE shitposting_db.tags_tbl(
 );
 
 CREATE TABLE shitposting_db.user_privileges_tbl(
-	id INT NOT NULL AUTO_INCREMENT,
 	name VARCHAR(16) NOT NULL,
 	owner TINYINT NULL,
 	administrator TINYINT NOT NULL,
@@ -16,8 +15,7 @@ CREATE TABLE shitposting_db.user_privileges_tbl(
 	remove TINYINT NOT NULL,
 	rate TINYINT NOT NULL,
 	query TINYINT NOT NULL,
-	PRIMARY KEY(id),
-	UNIQUE KEY name_UNIQUE (name),
+	PRIMARY KEY(name),
 	UNIQUE KEY owner_UNIQUE (owner),
 	CONSTRAINT owner_oneOnly CHECK (owner = TRUE OR owner = NULL),
 	CONSTRAINT administrator_bool CHECK (administrator = TRUE OR administrator = FALSE),
@@ -28,11 +26,11 @@ CREATE TABLE shitposting_db.user_privileges_tbl(
 );
 
 CREATE TABLE shitposting_db.users_tbl(
-	discord_user_id INT NOT NULL,
-	privilege_id INT NOT NULL,
+	discord_user_id VARCHAR(18) NOT NULL,
+	privilege_name VARCHAR(16) NOT NULL,
 	PRIMARY KEY(discord_user_id),
 	CONSTRAINT FK_privilegeID_users
-		FOREIGN KEY(privilege_id) REFERENCES shitposting_db.user_privileges_tbl(id)
+		FOREIGN KEY(privilege_name) REFERENCES shitposting_db.user_privileges_tbl(name)
 		ON DELETE RESTRICT
 		ON UPDATE CASCADE
 );
@@ -41,7 +39,7 @@ CREATE TABLE shitposting_db.shitposts_tbl(
 	id INT NOT NULL AUTO_INCREMENT,
 	file BLOB NOT NULL,
 	filename VARCHAR(45) NOT NULL,
-	submitter_id INT NOT NULL,
+	submitter_id VARCHAR(18) NOT NULL,
 	description VARCHAR(255) NULL,
 	PRIMARY KEY(id),
 	CONSTRAINT FK_submitterID_shitposts
@@ -69,7 +67,7 @@ CREATE TABLE shitposting_db.shitposting_tags_tbl(
 CREATE TABLE shitposting_db.rating_tbl(
 	entry INT NOT NULL AUTO_INCREMENT,
 	value TINYINT NOT NULL,
-	submitter_id INT NOT NULL,
+	submitter_id VARCHAR(18) NOT NULL,
 	shitpost_id INT NOT NULL,
 	PRIMARY KEY(entry),
 	UNIQUE KEY rate_UNIQUE (submitter_id, shitpost_id),
