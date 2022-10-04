@@ -433,8 +433,6 @@ async def cyber(ctx, args=""):
                 except IndexError:
                     pass
         await ctx.respond(content="", file=discord.File(fp=io.BytesIO(cv2.imencode(".png", current_img)[1].tobytes()), filename="outputImage.png"))
-
-
 # endregion
 
 #region Personal management
@@ -531,38 +529,131 @@ async def glory_days(ctx, language:str="en"):
 #endregion
 
 #region shitposting
-@BillyBot.slash_command(name="sp_add_user")
-async def sp_add_user(ctx, discord_user:str, privilege_name:str):
+@BillyBot.slash_command(name="sp_modify_user")
+async def sp_modify_user(ctx, discord_user:str, privilege_name:str):
     """
-    Adds a discord user into the shitposting database.
+    Modifies the privilege of a given discord user.
+    If the user is not in the database, adds it to the database with the given privilege
+    Administrator privilege is required to use this command
+    Owner privilege is required to deal with administrator or owner privileges
     """
     discord_user = str(discord_user)
     discord_users = dict([(member.mention, member.id) for member in ctx.guild.members])
     if discord_user not in discord_users.keys():
         ctx.respond("Invalid discord user")
         return
-    discord_user = discord_users[discord_user]
-    sql_cursor.execute(f"SELECT privilege_name FROM users_tbl WHERE discord_user_id={ctx.author.id};")
+    target_user = str(discord_users[discord_user])
+
+    sql_cursor.execute(f"SELECT * FROM user_privileges_view WHERE discord_user_id=\"{ctx.author.id}\";")
+    author_privilege = list(sql_cursor)
+    sql_cursor.execute(f"SELECT * FROM user_privileges_view WHERE discord_user_id=\"{target_user}\";")
+    target_privilege = list(sql_cursor)
+
     try:
-        author_privilege = [priv for priv in sql_cursor]
-        assert len(author_privilege) == 1
-        author_privilege = author_privilege[0][0]
-        sql_cursor.execute(f"SELECT administrator FROM user_privileges_tbl WHERE name=\"owner\";")
-        author_is_admin = [adm for adm in sql_cursor]
-        assert len(author_is_admin) == 1
-        assert author_is_admin[0][0] == 1
+        assert len(author_privilege) > 0
+        author_privilege = author_privilege[0]
+        assert author_privilege[3 + 1] == 1 # Check that author is admin
+
+        if len(target_privilege) > 0:
+            target_privilege = target_privilege[0]
+            if author_privilege[3 + 0] != 1: # Only restrict if author is not owner
+                assert target_privilege[3 + 1] == 0 and target_privilege[3 + 0] == None # Check that target is not admin or owner
     except AssertionError:
         await ctx.respond("Insufficient user privilege")
         return
 
-    sql_cursor.execute("SELECT name FROM user_privileges_tbl;")
-    privilege_names = [priv_name for subl in sql_cursor for priv_name in subl]
-    if privilege_name not in privilege_names:
-        await ctx.respond("Invalid privilege name. See list of valid permissions:\n\n" + "\n".join(privilege_names))
+    sql_cursor.execute("SELECT name, id FROM user_privileges_tbl;")
+    privilege_dict = dict(list(sql_cursor))
+    if privilege_name not in privilege_dict:
+        await ctx.respond("Invalid privilege name. See list of valid permissions:\n\n" + "\n".join([str(x) for x in privilege_dict.keys()]))
+        return
+    if len(target_privilege) == 0:
+        sql_cursor.execute(f"INSERT INTO users_tbl (discord_user_id, privilege_id) VALUES (\"{target_user}\", \"{privilege_dict[privilege_name]}\");")
+    else:
+        sql_cursor.execute(f"UPDATE users_tbl SET privilege_id=\"{privilege_dict[privilege_name]}\" WHERE discord_user_id=\"{target_user}\"")
+    sql_connection.commit()
+    await ctx.respond("Completed action")
+
+@BillyBot.slash_command(name="shitpost")
+async def shitpost(ctx, src:str, tags:str, description:str):
+    """
+    Uploads a shitpost into the database.
+    Requires submit privilege
+    """
+    await ctx.defer()
+    tags = tags.lower()
+    description = description.lower()
+
+    sql_cursor.execute(f"SELECT * FROM user_privileges_view WHERE discord_user_id=\"{ctx.author.id}\";")
+    author_privilege = list(sql_cursor)
+    try:
+        assert len(author_privilege) > 0
+        author_privilege = author_privilege[0]
+        assert author_privilege[3 + 2] == 1 # Check that author is allowed to submit
+    except AssertionError:
+        await ctx.respond("Insufficient user privilege")
         return
 
-    sql_cursor.execute(f"INSERT INTO users_tbl (discord_user_id, privilege_name) VALUES ({discord_user}, {privilege_name});")
-    await ctx.respond("Completed action")
+    media = bb_media.Media(src)
+    if media._route_type in ("generic_audio", "generic_video", "youtube_media", "generic_image", "generic_image"):
+        if media._route_type != "youtube_media":
+            media = bb_media.Static(src, False)
+        else:
+            media = bb_media.Streamable(src, False)
+        try:
+            if media._route_type == "youtube_media":
+                media.generate_stream(no_video=False)
+                media._source = media.youtube_src
+                media.extension = "mp4"
+            media.fetch_file(8388608)
+        except AssertionError:
+            await ctx.respond("Source too large for discord (>8MiB)")
+            return
+    else:
+        await ctx.respond("Shitpost src must be an audio/video file or youtube link")
+        return
+
+    try:
+        sql_cursor.execute(f"SELECT tag, id FROM tags_tbl;")
+        tag_list = list(sql_cursor)
+        assert len(tag_list) > 0
+        tag_list = dict(tag_list)
+        for tag in tags.split(' '):
+            for c in tag:
+                assert c.isalpha() or c == "_"
+            assert tag in tag_list
+    except AssertionError:
+        await ctx.respond("Invalid flags")
+        return
+
+    try:
+        assert len(description) > 16 and len(description) <= 255
+        for c in description:
+            assert c.isalpha() or c == " "
+    except AssertionError:
+        await ctx.respond("Invalid description. Length must be in (16-255) inclusive")
+        return
+
+    sql_cursor.execute("SELECT extension, id FROM file_extensions_tbl;")
+    legal_file_extensions = dict(list(sql_cursor))
+    try:
+        assert len(legal_file_extensions) > 0
+        assert media.extension in legal_file_extensions
+    except AssertionError:
+        await ctx.respond("Illegal file extension")
+        return
+    sql_insert_blob_query = """ INSERT INTO shitposts_tbl
+                          (file, file_extension_id, submitter_id, description) VALUES (%s,%s,%s,%s);"""
+    insert_blob_tuple = (media.get_content(), legal_file_extensions[media.extension], ctx.author.id, description)
+    sql_cursor.execute(sql_insert_blob_query, insert_blob_tuple)
+
+    shitpost_id = sql_cursor.lastrowid
+
+    for tag in tags.split(' '):
+        sql_cursor.execute(f"INSERT INTO shitposting_tags_tbl (tag_id, shitpost_id) VALUES ({tag_list[tag]}, {shitpost_id});")
+
+    sql_connection.commit()
+    await ctx.respond("Shitpost uploaded succesfuly.")
 #endregion
 
 #region intimidation responses

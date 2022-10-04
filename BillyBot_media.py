@@ -14,7 +14,7 @@ class Media:
     def __init__(self, source):
         self._name = None
         self._content = None
-        # generic_file, generic_video, generic_audio, youtube_media
+        # generic_file, generic_video, generic_audio, generic_image, youtube_media
         self._route_type = None
         self._source = source
         self.source_route()
@@ -69,32 +69,36 @@ class Media:
         """Sets the Media's _route_type variable"""
 
         route = None
+        extension = None
         if validators.url(self._source):
             if self._source.startswith("https://www.youtube.com/watch?v=") or self._source.startswith("https://youtu.be/"):
                 route = "youtube_media"
+            elif self._source.startswith("https://tenor.com/view/"):
+                extension = "gif"
+                route = "generic_image"
             elif '.' in self._source and '/' in self._source:
                 mimestart = mimetypes.guess_type(urlparse(self._source).path.split('/')[-1])[0]
                 if mimestart is not None:
                     if mimestart.split('/')[0] in ['video', 'audio', 'image']:
                         route = "generic_" + mimestart.split('/')[0]
+                        extension = mimestart.split('/')[1]
                 elif len(urlparse(self._source).path.split('/')[-1].split('.')) == 2:
                     route = "generic_file"
         self._route_type = route
+        self.extension = extension
 
-    def fetch_file(self):
+    def fetch_file(self, size_limit:int=104857600):
         # 100MB
-        size_limit = 104857600
         resp = requests.get(self._source, stream=True)
         resp.raise_for_status()
-        if len(resp.content) > size_limit:
-            raise ValueError('respose too large')
 
         contents = bytes()
-        # 8MB
+        # 8MB (8388608)
         curr_size = 0
-        for chunk in resp.iter_content(size_limit):
+        for chunk in resp.iter_content(8388608):
             curr_size += len(chunk)
             if curr_size > size_limit:
+                resp.close()
                 raise ValueError("response too large")
             contents += chunk
         self._content = contents
@@ -103,12 +107,13 @@ class Media:
         return self._route_type
 
 class Streamable(Media):
-    def __init__(self, source):
+    def __init__(self, source, gen_stream=True):
         super().__init__(source)
         # One time use discord streamable stream object
         self._stream = None
         assert self._route_type in ['generic_video', 'generic_audio', 'youtube_media']
-        self.generate_stream()
+        if gen_stream:
+            self.generate_stream()
 
     def __call__(self):
         return self.get_stream()
@@ -136,21 +141,36 @@ class Streamable(Media):
         # Options that seem to work perfectly (?)
         # ydl_options = {'format': 'bestaudio', 'noplaylist':'True'}
         # ffmpeg_options = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5', 'options': '-vn'}
-        ydl_options = {'format': 'worseaudio/bestaudio',
-                    'noplaylist':'True',
-                    'youtube_include_dash_manifest': False}
+
         ffmpeg_options = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
                         'options': '-vn'}
-
+        if no_video:
+            ydl_options = {'format': 'worseaudio/bestaudio',
+                        'noplaylist':'True',
+                        'youtube_include_dash_manifest': False}
+        else:
+            ydl_options = {'format': "bestvideo[filesize<=4MiB][ext=mp4]+bestaudio/best",
+                        'noplaylist':'True',
+                        'youtube_include_dash_manifest': False}
         # That source is a youtube link
         if self._route_type == "youtube_media":
             with YoutubeDL(ydl_options) as ydl:
                 info = ydl.extract_info(self._source, download=False)
-                url = info['formats'][0]['url']
+                i = 0
+                if not no_video:
+                    i = len(info['formats'])
+                    for fr in info['formats'][::-1]:
+                        if fr['ext'] == "mp4" and fr['fps'] != None and fr['format_note'] != "tiny":
+                            if fr['filesize'] != None and fr['filesize'] < 8388608:
+                                break
+                        i -= 1
+                        if i == 0:
+                            raise AssertionError("No suitable format found, too large")
+                url = info['formats'][i]['url']
+                self.youtube_src = url
 
                 self._name = info['title']
-                if no_video:
-                    self._stream = discord.FFmpegPCMAudio(url, **ffmpeg_options)
+                self._stream = discord.FFmpegPCMAudio(url, **ffmpeg_options)
 
         # The source is a link to a file TODO: Implement properly
         elif self._route_type in ["generic_video", "generic_audio"]:
@@ -162,9 +182,10 @@ class Streamable(Media):
         "streamableMedia<{0}>".format(self._name)
 
 class Static(Media):
-    def __init__(self, source):
+    def __init__(self, source, gen_content=True):
         super().__init__(source)
-        self.generate_content()
+        if gen_content:
+            self.generate_content()
 
     def get_content(self):
         return self._content
