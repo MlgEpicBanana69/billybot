@@ -29,3 +29,12 @@ def merge_pixels(foreground, background):
                     * background_alpha * (1 - foreground_alpha)) / merged_alpha
     return np.array([int(merged_red * 255), int(merged_green * 255),
                      int(merged_blue * 255), int(merged_alpha * 255)])
+
+#region discord
+def discord_mention_to_user_id(ctx, discord_mention:str):
+    """"""
+    discord_users = [member.id for member in ctx.guild.members if member.mention == discord_mention]
+    if len(discord_users) == 0:
+        raise ValueError("Discord user not in CTX")
+    return str(discord_users[0])
+#endregion

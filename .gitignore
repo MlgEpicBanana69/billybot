@@ -6,15 +6,12 @@ __pycache__/
 # C extensions
 *.so
 
-# vim backup files
+# Vim backup files
 *~
 *.swp
 
 # Token file
 token.txt
-
-# Environment file
-.env
 
 # Vscode
 *.vs

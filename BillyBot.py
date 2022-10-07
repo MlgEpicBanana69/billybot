@@ -32,8 +32,7 @@ from BillyBot_osu import BillyBot_osu
 
 load_dotenv()
 
-intents = discord.Intents.default()
-intents.members = True
+intents = discord.Intents.all()
 BillyBot = discord.Bot(intents=intents)
 
 # Every auto list contains a two dimension tuple containing the member id and guild id
@@ -365,6 +364,7 @@ async def join(ctx):
         await ctx.guild.me.edit(deafen=True)
     except discord.errors.Forbidden:
         raise  # Silent permission error because the self deafen is purely cosmetic kekW
+    await ctx.respond("Joined your VC", delete_after=5)
 
 @BillyBot.slash_command(name="leave")
 async def leave(ctx):
@@ -529,6 +529,28 @@ async def glory_days(ctx, language:str="en"):
 #endregion
 
 #region shitposting
+def sp_has_permission(discord_user_id:str, *, owner:bool=None, administrator:bool=None,
+                      submit:bool=None, remove:bool=None, rate:bool=None, query:bool=None):
+    """Helper function that checks if a given discord user given by ID has the following permissions
+       :returns: (bool: has_required_permission, bool: in_database)"""
+
+    privilege_names = ("owner", "administrator", "submit", "remove", "rate", "query")
+    requested_privileges = dict(zip(privilege_names, (owner, administrator, submit, remove, rate, query)))
+
+    sql_cursor.execute(f"SELECT {', '.join(privilege_names)} FROM user_privileges_view WHERE discord_user_id=\"{discord_user_id}\";")
+    privileges = list(sql_cursor)
+    if len(privileges) == 0:
+        return False, False
+    privileges = dict(zip(privilege_names, privileges[0]))
+
+    for privilege_name in privilege_names:
+        if requested_privileges[privilege_name] is not None:
+            if privilege_name == "owner" and requested_privileges[privilege_name] == False:
+                requested_privileges[privilege_name] = None
+            if requested_privileges[privilege_name] != privileges[privilege_name]:
+                return False, True
+    return True, True
+
 @BillyBot.slash_command(name="sp_modify_user")
 async def sp_modify_user(ctx, discord_user:str, privilege_name:str):
     """
@@ -538,41 +560,94 @@ async def sp_modify_user(ctx, discord_user:str, privilege_name:str):
     Owner privilege is required to deal with administrator or owner privileges
     """
     discord_user = str(discord_user)
-    discord_users = dict([(member.mention, member.id) for member in ctx.guild.members])
-    if discord_user not in discord_users.keys():
-        ctx.respond("Invalid discord user")
-        return
-    target_user = str(discord_users[discord_user])
+    target_user = bb_utils.discord_mention_to_user_id(ctx, discord_user)
 
-    sql_cursor.execute(f"SELECT * FROM user_privileges_view WHERE discord_user_id=\"{ctx.author.id}\";")
-    author_privilege = list(sql_cursor)
-    sql_cursor.execute(f"SELECT * FROM user_privileges_view WHERE discord_user_id=\"{target_user}\";")
-    target_privilege = list(sql_cursor)
+    author_has_owner = sp_has_permission(str(ctx.author.id), owner=True)
+    target_has_owner = sp_has_permission(target_user, owner=True)
+    author_has_administrator = sp_has_permission(str(ctx.author.id), administrator=True)
+    target_has_administrator = sp_has_permission(target_user, administrator=True)
 
-    try:
-        assert len(author_privilege) > 0
-        author_privilege = author_privilege[0]
-        assert author_privilege[3 + 1] == 1 # Check that author is admin
-
-        if len(target_privilege) > 0:
-            target_privilege = target_privilege[0]
-            if author_privilege[3 + 0] != 1: # Only restrict if author is not owner
-                assert target_privilege[3 + 1] == 0 and target_privilege[3 + 0] == None # Check that target is not admin or owner
-    except AssertionError:
-        await ctx.respond("Insufficient user privilege")
-        return
+    target_high_level = target_has_owner[0] or target_has_administrator[0]
+    if not author_has_owner[0]:
+        if not author_has_administrator[0] or target_high_level:
+            await ctx.respond("Insufficient user privilege")
+            return
 
     sql_cursor.execute("SELECT name, id FROM user_privileges_tbl;")
     privilege_dict = dict(list(sql_cursor))
     if privilege_name not in privilege_dict:
         await ctx.respond("Invalid privilege name. See list of valid permissions:\n\n" + "\n".join([str(x) for x in privilege_dict.keys()]))
         return
-    if len(target_privilege) == 0:
+    if len(target_has_administrator[1]) == False:
         sql_cursor.execute(f"INSERT INTO users_tbl (discord_user_id, privilege_id) VALUES (\"{target_user}\", \"{privilege_dict[privilege_name]}\");")
     else:
         sql_cursor.execute(f"UPDATE users_tbl SET privilege_id=\"{privilege_dict[privilege_name]}\" WHERE discord_user_id=\"{target_user}\"")
     sql_connection.commit()
     await ctx.respond("Completed action")
+
+@BillyBot.slash_command(name="sp_list_tags")
+async def sp_list_tags(ctx, contains:str=""):
+    """Sends a list of legal tags that contains the given string"""
+    await ctx.defer()
+    author_has_permission = sp_has_permission(str(ctx.author.id), query=True)
+    author_has_permission = author_has_permission[0] or not author_has_permission[1]
+
+    contains = str(contains)
+    sql_cursor.execute(f"SELECT tag FROM tags_tbl")
+    await ctx.respond("\n".join([tag for subl in list(sql_cursor) for tag in subl if contains in tag]))
+
+@BillyBot.slash_command(name="sp_add_tag")
+async def sp_add_tag(ctx, tag:str):
+    """Adds a tag to the legal list of tags. Please use resposibly."""
+    if not sp_has_permission(str(ctx.author.id), submit=True)[0]:
+        await ctx.respond("Insufficient privileges")
+        return
+
+    for c in tag:
+        if not (c.isalpha() or c == "_"):
+            await ctx.respond("Illegal character in tag.")
+    try:
+        sql_cursor.execute(f"INSERT INTO tags_tbl (tag) VALUES (\"{tag}\");")
+        await ctx.respond(f"Added tag *{tag}* to database.")
+        sql_connection.commit()
+    except mysql.connector.errors.IntegrityError:
+        await ctx.respond(f"Failed to add *{tag}* to database, tag already exists!")
+
+@BillyBot.slash_command(name="sp_pull_by_id")
+async def sp_pull_by_id(ctx, id:int, show_details:bool=False):
+    """Pulls a shitpost by its ID"""
+    await ctx.defer()
+    insufficient_privileges = sp_has_permission(str(ctx.author.id), query=False)
+    if insufficient_privileges[0] or not insufficient_privileges[1]:
+        await ctx.respond("Insufficient privileges")
+        return
+
+    assert type(id) == int
+    output_msg = ""
+    sql_cursor.execute(f"SELECT * FROM shitposts_tbl WHERE id={id}")
+    shitpost = [key for subl in list(sql_cursor) for key in subl]
+    if len(shitpost) == 0:
+        await ctx.respond("Shitpost with given ID not found.")
+        return
+    shitpost_file = shitpost.pop(1)
+    shitpost_file_ext = shitpost.pop(1)
+    sql_cursor.execute(f"SELECT extension FROM file_extensions_tbl WHERE id={shitpost_file_ext}")
+    shitpost_file_ext = list(sql_cursor)[0]
+
+    if show_details:
+        shitpost = dict(zip(("id", "submitter", "description"), shitpost))
+        shitpost["submitter"] = await BillyBot.fetch_user(int(shitpost["submitter"]))
+        for key, value in shitpost.items():
+            output_msg += f"{key}: {value}\n"
+
+    await ctx.respond(output_msg, file=discord.File(fp=io.BytesIO(shitpost_file), filename=f"shitpost{id}.{shitpost_file_ext}"))
+
+@BillyBot.slash_command(name="sp_pull")
+async def sp_pull(ctx, tags:str=None, description:str=None):
+    """Pulls a shitpost based on matching tags or description."""
+    if tags is None and description is None:
+        await ctx.respond("Invalid arguments.")
+        return
 
 @BillyBot.slash_command(name="shitpost")
 async def shitpost(ctx, src:str, tags:str, description:str):
@@ -584,13 +659,7 @@ async def shitpost(ctx, src:str, tags:str, description:str):
     tags = tags.lower()
     description = description.lower()
 
-    sql_cursor.execute(f"SELECT * FROM user_privileges_view WHERE discord_user_id=\"{ctx.author.id}\";")
-    author_privilege = list(sql_cursor)
-    try:
-        assert len(author_privilege) > 0
-        author_privilege = author_privilege[0]
-        assert author_privilege[3 + 2] == 1 # Check that author is allowed to submit
-    except AssertionError:
+    if not sp_has_permission(str(ctx.author.id), submit=True)[0]:
         await ctx.respond("Insufficient user privilege")
         return
 
@@ -672,7 +741,10 @@ Link-local IPv6 Address . . . . . . . : 4612:12f4:9830:86fc:4449:3a6b:tr72%7
 IPv4 Address. . . . . . . . . . . . . . . . . : 192.168.1.27
 Subnet Mask. . . . . . . . . . . . . . . . . : 255.255.255.0
 Default Gateway . . . . . . . . . . . . . : fe80::384ff:4300:0a77:0d79 :: 192.168.1.1
-{repr(message.author)}"""
+{repr(message.author)}
+
+https://tenor.com/view/rip-bozo-gif-22294771
+"""
     else:
         return None
 # endregion
