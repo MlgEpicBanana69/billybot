@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 import cv2
 import numpy as np
 import validators
+import hashlib
 import mysql.connector
 
 import BillyBot_utils as bb_utils
@@ -46,6 +47,7 @@ bb_osu = BillyBot_osu(osu_token)
 
 # Connect to the shitposting database
 sql_connection = mysql.connector.connect(user="light", password=sql_pw, host="127.0.0.1", database="shitposting_db")
+sql_connection.autocommit = True
 sql_cursor = sql_connection.cursor()
 
 #region Bot events
@@ -258,7 +260,7 @@ async def play(ctx, source):
     # also when multiple sources are given, BillyBot takes only the first one
     # further attachments are *completely* ignored."""
     if ctx.author.voice is not None:
-        await join(ctx)
+        await join(ctx, False)
         guild_player = bb_media.Player.get_player(ctx.guild)
 
         # Source is attachment
@@ -286,7 +288,7 @@ async def play(ctx, source):
             await guild_player.play(media)
             await ctx.respond(f"{chosen_result[1]} added to queue!")
     else:
-        ctx.respond("You're not in any voice channel.")
+        await ctx.respond("You're not in any voice channel.")
 
 @BillyBot.slash_command(name="stop")
 async def stop(ctx):
@@ -351,7 +353,7 @@ async def queue(ctx):
 
 #region Voice commands
 @BillyBot.slash_command(name="join")
-async def join(ctx):
+async def join(ctx, respond_on_join=True):
     """Joins into your voice channel."""
     if ctx.author.voice is None:
         await ctx.respond("You're not in any voice channel.")
@@ -364,7 +366,8 @@ async def join(ctx):
         await ctx.guild.me.edit(deafen=True)
     except discord.errors.Forbidden:
         raise  # Silent permission error because the self deafen is purely cosmetic kekW
-    await ctx.respond("Joined your VC", delete_after=5)
+    if respond_on_join:
+        await ctx.respond("Joined your VC", delete_after=5)
 
 @BillyBot.slash_command(name="leave")
 async def leave(ctx):
@@ -578,11 +581,10 @@ async def sp_modify_user(ctx, discord_user:str, privilege_name:str):
     if privilege_name not in privilege_dict:
         await ctx.respond("Invalid privilege name. See list of valid permissions:\n\n" + "\n".join([str(x) for x in privilege_dict.keys()]))
         return
-    if len(target_has_administrator[1]) == False:
+    if target_has_administrator[1] == False:
         sql_cursor.execute(f"INSERT INTO users_tbl (discord_user_id, privilege_id) VALUES (\"{target_user}\", \"{privilege_dict[privilege_name]}\");")
     else:
         sql_cursor.execute(f"UPDATE users_tbl SET privilege_id=\"{privilege_dict[privilege_name]}\" WHERE discord_user_id=\"{target_user}\"")
-    sql_connection.commit()
     await ctx.respond("Completed action")
 
 @BillyBot.slash_command(name="sp_list_tags")
@@ -603,13 +605,13 @@ async def sp_add_tag(ctx, tag:str):
         await ctx.respond("Insufficient privileges")
         return
 
+    tag = tag.upper()
     for c in tag:
         if not (c.isalpha() or c == "_"):
             await ctx.respond("Illegal character in tag.")
     try:
         sql_cursor.execute(f"INSERT INTO tags_tbl (tag) VALUES (\"{tag}\");")
         await ctx.respond(f"Added tag *{tag}* to database.")
-        sql_connection.commit()
     except mysql.connector.errors.IntegrityError:
         await ctx.respond(f"Failed to add *{tag}* to database, tag already exists!")
 
@@ -630,6 +632,7 @@ async def sp_pull_by_id(ctx, id:int, show_details:bool=False):
         await ctx.respond("Shitpost with given ID not found.")
         return
     shitpost_file = shitpost.pop(1)
+    shitpost_file_hash = shitpost.pop(1)
     shitpost_file_ext = shitpost.pop(1)
     sql_cursor.execute(f"SELECT extension FROM file_extensions_tbl WHERE id={shitpost_file_ext}")
     shitpost_file_ext = list(sql_cursor)[0]
@@ -639,15 +642,77 @@ async def sp_pull_by_id(ctx, id:int, show_details:bool=False):
         shitpost["submitter"] = await BillyBot.fetch_user(int(shitpost["submitter"]))
         for key, value in shitpost.items():
             output_msg += f"{key}: {value}\n"
+        output_msg += f"hash: {shitpost_file_hash}"
 
     await ctx.respond(output_msg, file=discord.File(fp=io.BytesIO(shitpost_file), filename=f"shitpost{id}.{shitpost_file_ext}"))
 
 @BillyBot.slash_command(name="sp_pull")
-async def sp_pull(ctx, tags:str=None, description:str=None):
+async def sp_pull(ctx, tags:str=None, keyphrase:str=None):
     """Pulls a shitpost based on matching tags or description."""
-    if tags is None and description is None:
+    await ctx.defer()
+    if tags is None and keyphrase is None:
         await ctx.respond("Invalid arguments.")
         return
+
+    sql_cursor.execute("SELECT id, description FROM shitposts_tbl;")
+    shitpost_descriptions = dict(list(sql_cursor))
+
+    keyword_filter = {}
+    if keyphrase is not None:
+        keyphrase = keyphrase.lower()
+        for sp_id, sp_desc in shitpost_descriptions.items():
+            if keyphrase in sp_desc:
+                keyword_filter[sp_id] = len(keyphrase)
+        if len(keyword_filter) == 0 and len(keyphrase.split(' ')) == 1:
+            await ctx.respond("Could not find shitpost with given tags and keyphrase")
+            return
+        elif len(keyword_filter) == 0:
+            with open("resources/conjuctions.txt", "r") as conjuction_file:
+                conjuction_words = conjuction_file.read().split('\n')
+            for sp_id, sp_desc in shitpost_descriptions.items():
+                for part in keyphrase.split(' '):
+                    if part in sp_desc and part not in conjuction_words:
+                        if sp_id not in keyword_filter:
+                            keyword_filter[sp_id] = len(part)
+                        else:
+                            keyword_filter[sp_id] += len(part)
+            if len(keyword_filter) == 0:
+                await ctx.respond("Could not find shitpost with given tags and keyphrase")
+                return
+
+    output = set()
+    if tags is not None:
+        tags = tags.upper()
+        tag_list = tags.split(' ')
+        for tag in tag_list:
+            for c in tag:
+                if not c.isalpha() and c != '_':
+                    await ctx.respond("One or more tags contain illegal characters")
+
+        sql_cursor.execute("SELECT tag, shitposting_tags_tbl.shitpost_id FROM tags_tbl INNER JOIN shitposting_tags_tbl ON id = tag_id")
+        shitposts_tags = dict(list(sql_cursor))
+        tagged_shitposts = {}
+        max_tagged = 0
+        for sp_tag, sp_id in shitposts_tags.items():
+            if sp_tag in tags:
+                if sp_id not in tagged_shitposts.keys():
+                    tagged_shitposts[sp_id] = 0
+                else:
+                    tagged_shitposts[sp_id] += 1
+                if tagged_shitposts[sp_id] > max_tagged:
+                    max_tagged = tagged_shitposts[sp_id]
+
+        if sum(tagged_shitposts.values()) == 0:
+            await ctx.respond("Could not find shitpost with given tags and keyphrase")
+            return
+        for sp_id in keyword_filter.keys():
+            if sp_id in tagged_shitposts:
+                if tagged_shitposts[sp_id] == max_tagged:
+                    output.add(sp_id)
+    else:
+        output = set(keyword_filter.keys())
+
+    await ctx.respond(f"{output}")
 
 @BillyBot.slash_command(name="shitpost")
 async def shitpost(ctx, src:str, tags:str, description:str):
@@ -656,7 +721,7 @@ async def shitpost(ctx, src:str, tags:str, description:str):
     Requires submit privilege
     """
     await ctx.defer()
-    tags = tags.lower()
+    tags = tags.upper()
     description = description.lower()
 
     if not sp_has_permission(str(ctx.author.id), submit=True)[0]:
@@ -698,7 +763,7 @@ async def shitpost(ctx, src:str, tags:str, description:str):
     try:
         assert len(description) > 16 and len(description) <= 255
         for c in description:
-            assert c.isalpha() or c == " "
+            assert c.isalpha() or c.isdigit() or c in (' ', "'", ',', ".", "!", "_", "-")
     except AssertionError:
         await ctx.respond("Invalid description. Length must be in (16-255) inclusive")
         return
@@ -712,17 +777,20 @@ async def shitpost(ctx, src:str, tags:str, description:str):
         await ctx.respond("Illegal file extension")
         return
     sql_insert_blob_query = """ INSERT INTO shitposts_tbl
-                          (file, file_extension_id, submitter_id, description) VALUES (%s,%s,%s,%s);"""
-    insert_blob_tuple = (media.get_content(), legal_file_extensions[media.extension], ctx.author.id, description)
-    sql_cursor.execute(sql_insert_blob_query, insert_blob_tuple)
+                          (file, file_hash, file_extension_id, submitter_id, description) VALUES (%s,%s,%s,%s,%s);"""
+    media_contents = media.get_content()
+    media_hash = hashlib.sha256(media_contents).hexdigest()
+    insert_blob_tuple = (media_contents, media_hash, legal_file_extensions[media.extension], ctx.author.id, description)
+    try:
+        sql_cursor.execute(sql_insert_blob_query, insert_blob_tuple)
+        shitpost_id = sql_cursor.lastrowid
 
-    shitpost_id = sql_cursor.lastrowid
+        for tag in tags.split(' '):
+            sql_cursor.execute(f"INSERT INTO shitposting_tags_tbl (tag_id, shitpost_id) VALUES ({tag_list[tag]}, {shitpost_id});")
 
-    for tag in tags.split(' '):
-        sql_cursor.execute(f"INSERT INTO shitposting_tags_tbl (tag_id, shitpost_id) VALUES ({tag_list[tag]}, {shitpost_id});")
-
-    sql_connection.commit()
-    await ctx.respond("Shitpost uploaded succesfuly.")
+        await ctx.respond("Shitpost uploaded succesfuly.")
+    except mysql.connector.errors.IntegrityError:
+        await ctx.respond("Shitpost already exists within database!")
 #endregion
 
 #region intimidation responses

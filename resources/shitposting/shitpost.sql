@@ -3,7 +3,7 @@ USE shitposting_db;
 
 CREATE TABLE tags_tbl(
 	id INT NOT NULL AUTO_INCREMENT,
-	tag VARCHAR(255) NOT NULL,
+	tag VARCHAR(256) NOT NULL,
 	PRIMARY KEY(id),
 	UNIQUE KEY tag_UNIQUE (tag)
 );
@@ -48,10 +48,13 @@ CREATE TABLE users_tbl(
 CREATE TABLE shitposts_tbl(
 	id INT NOT NULL AUTO_INCREMENT,
 	file MEDIUMBLOB NOT NULL,
+	file_hash VARCHAR(64) NOT NULL,
 	file_extension_id INT NOT NULL,
 	submitter_id VARCHAR(18) NOT NULL,
-	description VARCHAR(255) NULL,
+	description VARCHAR(256) NULL,
 	PRIMARY KEY(id),
+	UNIQUE KEY UNIQUE_shitpostDescription (description),
+	UNIQUE KEY UNIQUE_fileHash (file_hash),
 	CONSTRAINT FK_fileExtensionID_shitposts
 		FOREIGN KEY(file_extension_id) REFERENCES file_extensions_tbl(id)
 		ON DELETE RESTRICT
@@ -105,20 +108,33 @@ INSERT INTO user_privileges_tbl
 ("user", NULL, FALSE, FALSE, FALSE, FALSE, TRUE),
 ("banned", NULL, FALSE, FALSE, FALSE, FALSE, FALSE);
 
+/*
 INSERT INTO tags_tbl (tag) VALUES
-("aranara"),
 ("amogus"),
+("aranara"),
+("better_call_saul"),
+("breaking_bad"),
+("cars_movie"),
+("cbt"),
+("fumo"),
 ("lebron_james"),
-("osu!"),
+("low_quality"),
 ("my_child_meme"),
-("touhou"),
+("one_piece"),
+("osu!"),
 ("piracy"),
-("fumo")
+("introduction_meme"),
+("speedy_mcqueen"),
+("the_one_piece_is_real"),
+("threat"),
+("touhou")
 ;
+*/
 
 INSERT INTO file_extensions_tbl (extension) VALUES
 ("png"),
 ("jpg"),
+("jpeg"),
 ("mp4"),
 ("mp3"),
 ("gif");
