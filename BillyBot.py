@@ -7,7 +7,6 @@ from discord.ext import commands
 from discord.utils import get
 import asyncio
 from dotenv import load_dotenv
-
 import cv2
 import numpy as np
 import validators
@@ -62,6 +61,10 @@ async def on_ready():
     # Log and wait for bot to be online
     await BillyBot.change_presence(status=discord.Status.online)
     print("Logged on as {0}!".format(BillyBot.user))
+
+    # test
+    test = bb_media.Media("https://www.reddit.com/r/discordVideos/comments/y5wk3s/dont_worry_he_just_tripped/")
+    #test = bb_media.Media("https://www.reddit.com/r/osugame/comments/y791u4/kasugano_sora_17_aqours_mitaiken_horizon_sunshine/")
 
 @BillyBot.event
 async def on_message(message):

@@ -3,7 +3,6 @@ import re
 import requests
 import mimetypes
 mimetypes.init()
-
 import validators
 from youtube_dl import YoutubeDL
 from urllib.parse import urlparse
@@ -11,10 +10,14 @@ import discord
 from discord.utils import get
 
 class Media:
+    GENERIC_IMAGE = "generic_image"
+    GENERIC_VIDEO = "generic_video"
+    GENERIC_AUDIO = "generic_audio"
+    GENERIC_FILE  = "generic_file"
+
     def __init__(self, source):
         self._name = None
         self._content = None
-        # generic_file, generic_video, generic_audio, generic_image, youtube_media
         self._route_type = None
         self._source = source
         self.source_route()
@@ -68,22 +71,32 @@ class Media:
     def source_route(self):
         """Sets the Media's _route_type variable"""
 
+        ydl_options = {'format': 'bestvideo[filesize<8MiB][ext=mp4]+bestaudio[ext=m4a]/bestvideo[filesize<8MiB]+bestaudio/best[filesize<8MiB]',
+                    'noplaylist':'True',
+                    'youtube_include_dash_manifest': False}
+
         route = None
         extension = None
         if validators.url(self._source):
-            if self._source.startswith("https://www.youtube.com/watch?v=") or self._source.startswith("https://youtu.be/"):
-                route = "youtube_media"
-            elif self._source.startswith("https://tenor.com/view/"):
-                extension = "gif"
-                route = "generic_image"
+            if Media.is_web_media(self._source):
+                with YoutubeDL(ydl_options) as ydl:
+                    info = ydl.extract_info(self._source, download=False)
+                    mimestart = mimetypes.guess_type("a." + info['ext'])[0]
+                    if 'formats' in info:
+                        self._source = info['formats'][-1]['url']
+                    elif 'thumbnails' in info:
+                        self._source = info['thumbnails'][-1]['url']
+                    else:
+                        raise AssertionError("osuHOW")
             elif '.' in self._source and '/' in self._source:
                 mimestart = mimetypes.guess_type(urlparse(self._source).path.split('/')[-1])[0]
-                if mimestart is not None:
-                    if mimestart.split('/')[0] in ['video', 'audio', 'image']:
-                        route = "generic_" + mimestart.split('/')[0]
-                        extension = mimestart.split('/')[1]
-                elif len(urlparse(self._source).path.split('/')[-1].split('.')) == 2:
-                    route = "generic_file"
+
+            if mimestart is not None:
+                if mimestart.split('/')[0] in ['video', 'audio', 'image']:
+                    route = "generic_" + mimestart.split('/')[0]
+                    extension = mimestart.split('/')[1]
+            elif len(urlparse(self._source).path.split('/')[-1].split('.')) == 2:
+                route = Media.GENERIC_FILE
         self._route_type = route
         self.extension = extension
 
@@ -106,11 +119,26 @@ class Media:
     def get_route_type(self):
         return self._route_type
 
+    @staticmethod
+    def is_web_media(src:str):
+        """
+        Returns true if media source is a web url to a proccessable website media
+        """
+        if validators.url(src):
+            if src.startswith("https://www.youtube.com/watch?v=") or src.startswith("https://youtu.be/"):
+                return True
+            elif src.startswith("https://www.reddit.com/"):
+                return True
+            elif src.startswith("https://tenor.com/view/"):
+                return True
+        return False
+
 class Streamable(Media):
     def __init__(self, source, gen_stream=True):
         super().__init__(source)
         # One time use discord streamable stream object
         self._stream = None
+        self._web_src = None
         assert self._route_type in ['generic_video', 'generic_audio', 'youtube_media']
         if gen_stream:
             self.generate_stream()
@@ -149,11 +177,11 @@ class Streamable(Media):
                         'noplaylist':'True',
                         'youtube_include_dash_manifest': False}
         else:
-            ydl_options = {'format': "bestvideo[filesize<=4MiB][ext=mp4]+bestaudio/best",
+            ydl_options = {'format': "bestvideo[filesize<8MiB][ext=mp4]+bestaudio/best",
                         'noplaylist':'True',
                         'youtube_include_dash_manifest': False}
         # That source is a youtube link
-        if self._route_type == "youtube_media":
+        if self._route_type == Media.GENERIC_AUDIO:
             with YoutubeDL(ydl_options) as ydl:
                 info = ydl.extract_info(self._source, download=False)
                 i = 0
