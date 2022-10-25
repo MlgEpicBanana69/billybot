@@ -12,6 +12,7 @@ import numpy as np
 import validators
 import hashlib
 import mysql.connector
+from concurrent.futures import ThreadPoolExecutor
 
 import BillyBot_utils as bb_utils
 import BillyBot_games as bb_games
@@ -34,6 +35,8 @@ load_dotenv()
 
 intents = discord.Intents.all()
 BillyBot = discord.Bot(intents=intents)
+
+BOT_DISCORD_FILE_LIMIT = bb_media.Media.DISCORD_FILE_LIMITERS[0]
 
 # Every auto list contains a two dimension tuple containing the member id and guild id
 # (id, guild_id)
@@ -61,10 +64,6 @@ async def on_ready():
     # Log and wait for bot to be online
     await BillyBot.change_presence(status=discord.Status.online)
     print("Logged on as {0}!".format(BillyBot.user))
-
-    # test
-    test = bb_media.Media("https://www.reddit.com/r/discordVideos/comments/y5wk3s/dont_worry_he_just_tripped/")
-    #test = bb_media.Media("https://www.reddit.com/r/osugame/comments/y791u4/kasugano_sora_17_aqours_mitaiken_horizon_sunshine/")
 
 @BillyBot.event
 async def on_message(message):
@@ -223,6 +222,16 @@ async def aranara(ctx):
     aranara_choice_name = random.choice(aranara_images)
     with open("resources\\aranara\\" + aranara_choice_name, "rb") as aranara_pick:
         await ctx.respond(file=discord.File(fp=aranara_pick, filename=aranara_choice_name))
+
+@BillyBot.slash_command(name="fetch_file")
+async def fetch_file(ctx, src:str):
+    await ctx.defer()
+    media = bb_media.Media(src)
+    try:
+        media.fetch_file()
+        await ctx.respond(content=media.get_name(), file=discord.File(fp=io.BytesIO(media.get_content()), filename=f"{media.get_filename()}"))
+    except:
+        raise
 #endregion
 
 #region Chat toggles
@@ -252,30 +261,27 @@ async def wipe(ctx, n: int):
 
 #region Player commands
 @BillyBot.slash_command(name="play")
-async def play(ctx, source):
+async def play(ctx, source:str):
     """Plays audio from an audio source
 
-    # Playing a 'source' goes by a these rules:
-    # 1) An audio file is embeded, play that audio file
-    # 2) A link is requested, depending on where that link leads, fetch the audio file and play it
-    # 3) A query is requested, search that query on youtube and recommand multiple best results
-
-    # also when multiple sources are given, BillyBot takes only the first one
-    # further attachments are *completely* ignored."""
+    # Playing a 'source' goes by these rules:
+    # 1) A link is requested, depending on where that link leads, fetch the audio file and play it
+    # 2) A query is requested, search that query on youtube and recommand multiple best results
+    """
+    await ctx.defer()
     if ctx.author.voice is not None:
-        await join(ctx, False)
+        await bot_join(ctx)
         guild_player = bb_media.Player.get_player(ctx.guild)
 
         # Source is attachment
         # if len(ctx.message.attachments) > 0:
         #    attachment = ctx.message.attachments[0]
-        #    media = bb_media.Streamable(attachment.url)
-        #    await guild_player.play(media)#
+        #    media = bb_media.Media(attachment.url)
+        #    await guild_player.play(media)
 
-        await ctx.defer()
         # Source is message content
         if validators.url(source):
-            media = bb_media.Streamable(source)
+            media = bb_media.Media(source)
             await guild_player.play(media)
             await ctx.respond(media.get_name())
 
@@ -287,7 +293,7 @@ async def play(ctx, source):
             # TODO: Reactive video choosing
             chosen_result = results[0]
 
-            media = bb_media.Streamable(chosen_result[0])
+            media = bb_media.Media(chosen_result[0])
             await guild_player.play(media)
             await ctx.respond(f"{chosen_result[1]} added to queue!")
     else:
@@ -319,11 +325,6 @@ async def skip(ctx):
     await ctx.respond("Skipped")
     guild_player = bb_media.Player.get_player(ctx.guild)
     guild_player.next()
-    queue = guild_player.get_queue()
-    if len(queue) > 0:
-        await ctx.respond(f"Now playing: {str(queue[0])}")
-    else:
-        await ctx.respond("Queue ended, stopped playing.")
 
 @BillyBot.slash_command(name="shuffle")
 async def shuffle(ctx):
@@ -333,6 +334,7 @@ async def shuffle(ctx):
 @BillyBot.slash_command(name="loop")
 async def loop(ctx):
     """Toggles playlist loop on/off"""
+    await ctx.defer()
     loop_state = bb_media.Player.get_player(ctx.guild).toggle_loop()
     loop_state = "ON" if loop_state else "OFF"
     await ctx.respond("Loop is now {0}".format(loop_state))
@@ -356,8 +358,12 @@ async def queue(ctx):
 
 #region Voice commands
 @BillyBot.slash_command(name="join")
-async def join(ctx, respond_on_join=True):
+async def join(ctx):
     """Joins into your voice channel."""
+    await ctx.defer()
+    await bot_join(ctx, True)
+
+async def bot_join(ctx, respond_on_join=False):
     if ctx.author.voice is None:
         await ctx.respond("You're not in any voice channel.")
         return
@@ -394,10 +400,11 @@ async def cyber(ctx, args=""):
     message_sources = _all_ctx_sources(ctx, args)
     img_objects = []
     for i, source in enumerate(message_sources):
-        image_obj = bb_media.Static(source)
+        image_obj = bb_media.Media(source)
         if image_obj is not None:
-            if image_obj.get_route_type() == "generic_image":
-                nparr = np.frombuffer(image_obj(), np.uint8)
+            if image_obj.get_route_type() == bb_media.Media.GENERIC_IMAGE:
+                image_obj.fetch_file(BOT_DISCORD_FILE_LIMIT)
+                nparr = np.frombuffer(image_obj.get_content(), np.uint8)
                 cv2_img = cv2.imdecode(nparr, cv2.IMREAD_UNCHANGED)
                 if len(cv2_img[0][0]) < 4:
                     cv2_img = cv2.cvtColor(cv2_img, cv2.COLOR_RGB2RGBA)
@@ -731,23 +738,16 @@ async def shitpost(ctx, src:str, tags:str, description:str):
         await ctx.respond("Insufficient user privilege")
         return
 
+    # TODO: DEBUG HERE
     media = bb_media.Media(src)
-    if media._route_type in ("generic_audio", "generic_video", "youtube_media", "generic_image", "generic_image"):
-        if media._route_type != "youtube_media":
-            media = bb_media.Static(src, False)
-        else:
-            media = bb_media.Streamable(src, False)
+    if media.get_route_type() in (bb_media.Media.GENERIC_AUDIO, bb_media.Media.GENERIC_VIDEO, bb_media.Media.GENERIC_IMAGE):
         try:
-            if media._route_type == "youtube_media":
-                media.generate_stream(no_video=False)
-                media._source = media.youtube_src
-                media.extension = "mp4"
-            media.fetch_file(8388608)
+            media.fetch_file(BOT_DISCORD_FILE_LIMIT)
         except AssertionError:
-            await ctx.respond("Source too large for discord (>8MiB)")
+            await ctx.respond(f"Source too large for discord (>~{BOT_DISCORD_FILE_LIMIT//1000000}MiB)")
             return
     else:
-        await ctx.respond("Shitpost src must be an audio/video file or youtube link")
+        await ctx.respond("Shitpost src must be a media compatible type")
         return
 
     try:
@@ -789,7 +789,7 @@ async def shitpost(ctx, src:str, tags:str, description:str):
         shitpost_id = sql_cursor.lastrowid
 
         for tag in tags.split(' '):
-            sql_cursor.execute(f"INSERT INTO shitposting_tags_tbl (tag_id, shitpost_id) VALUES ({tag_list[tag]}, {shitpost_id});")
+            sql_cursor.execute("INSERT INTO shitposting_tags_tbl (tag_id, shitpost_id) VALUES (%d, %d);", (tag_list[tag], shitpost_id))
 
         await ctx.respond("Shitpost uploaded succesfuly.")
     except mysql.connector.errors.IntegrityError:
@@ -820,4 +820,5 @@ https://tenor.com/view/rip-bozo-gif-22294771
         return None
 # endregion
 
-BillyBot.run(discord_token)
+if __name__ == "__main__":
+    BillyBot.run(discord_token)
