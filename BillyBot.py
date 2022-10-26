@@ -48,7 +48,7 @@ sql_pw = os.environ.get("sql_pw")
 bb_osu = BillyBot_osu(osu_token)
 
 # Connect to the shitposting database
-sql_connection = mysql.connector.connect(user="light", password=sql_pw, host="127.0.0.1", database="shitposting_db")
+sql_connection = mysql.connector.connect(user="light", password=sql_pw, host="127.0.0.1", database="billybot_db")
 sql_connection.autocommit = True
 sql_cursor = sql_connection.cursor()
 
@@ -261,7 +261,7 @@ async def wipe(ctx, n: int):
 
 #region Player commands
 @BillyBot.slash_command(name="play")
-async def play(ctx, source:str):
+async def play(ctx, source:str, speed:float=1.0):
     """Plays audio from an audio source
 
     # Playing a 'source' goes by these rules:
@@ -272,6 +272,8 @@ async def play(ctx, source:str):
     if ctx.author.voice is not None:
         await bot_join(ctx)
         guild_player = bb_media.Player.get_player(ctx.guild)
+        ultimate_source = None
+
 
         # Source is attachment
         # if len(ctx.message.attachments) > 0:
@@ -281,10 +283,7 @@ async def play(ctx, source:str):
 
         # Source is message content
         if validators.url(source):
-            media = bb_media.Media(source)
-            await guild_player.play(media)
-            await ctx.respond(media.get_name())
-
+            ultimate_source = source
         # Source is youtube query
         else:
             results = bb_media.Media.query_youtube(source)
@@ -293,9 +292,11 @@ async def play(ctx, source:str):
             # TODO: Reactive video choosing
             chosen_result = results[0]
 
-            media = bb_media.Media(chosen_result[0])
-            await guild_player.play(media)
-            await ctx.respond(f"{chosen_result[1]} added to queue!")
+            ultimate_source = chosen_result[0]
+
+        media = bb_media.Media(ultimate_source, force_audio_only=True, speed=speed)
+        await guild_player.play(media)
+        await ctx.respond(f"{media.get_name()} added to queue!")
     else:
         await ctx.respond("You're not in any voice channel.")
 
@@ -551,16 +552,17 @@ def sp_has_permission(discord_user_id:str, *, owner:bool=None, administrator:boo
     requested_privileges = dict(zip(privilege_names, (owner, administrator, submit, remove, rate, query)))
 
     sql_cursor.execute("SELECT %s FROM sp_user_privileges_view WHERE discord_user_id=%s;", (', '.join(privilege_names), discord_user_id))
-    privileges = list(sql_cursor)
-    if len(privileges) == 0:
+    user_privileges = list(sql_cursor)
+    if len(user_privileges) == 0:
         return False, False
-    privileges = dict(zip(privilege_names, privileges[0]))
+    user_privileges = user_privileges[0][0].split(', ')
 
     for privilege_name in privilege_names:
         if requested_privileges[privilege_name] is not None:
+            # False value on owner is None (null)
             if privilege_name == "owner" and requested_privileges[privilege_name] == False:
                 requested_privileges[privilege_name] = None
-            if requested_privileges[privilege_name] != privileges[privilege_name]:
+            if privilege_name not in user_privileges:
                 return False, True
     return True, True
 
