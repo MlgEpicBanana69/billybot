@@ -18,7 +18,7 @@ class Media:
 
     # Options that seem to work perfectly (?)
     # ydl_options = {'format': 'bestaudio', 'noplaylist':'True'}
-    FFMPEG_OPTIONS = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5', 'options': ''}
+    FFMPEG_OPTIONS = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5', 'options': '-j'}
 
     DISCORD_FILE_LIMITERS = (8388608,)
 
@@ -130,20 +130,28 @@ class Media:
 
     def fetch_file(self, size_limit:int=104857600):
         # 100MB
-        ultimate_source = self.get_ultimate_source(no_video=False)
-        resp = requests.get(ultimate_source, stream=True)
-        resp.raise_for_status()
+        ultimate_sources = self.get_ultimate_source(no_video=False, sizelimit=size_limit)
+        for ultimate_source in ultimate_sources:
+            dl_too_large = False
+            resp = requests.get(ultimate_source, stream=True)
+            resp.raise_for_status()
 
-        contents = bytes()
-        # 4MB (4194304)
-        curr_size = 0
-        for chunk in resp.iter_content(4194304):
-            curr_size += len(chunk)
-            if curr_size > size_limit:
-                resp.close()
-                raise ValueError("response too large")
-            contents += chunk
+            contents = bytes()
+            # 4MB (4194304)
+            curr_size = 0
+            for chunk in resp.iter_content(65536):
+                curr_size += len(chunk)
+                if curr_size > size_limit:
+                    resp.close()
+                    dl_too_large = True
+                    break
+                contents += chunk
+            if not dl_too_large:
+                break
+        else:
+            raise ValueError("response too large")
         self._content = contents
+
 
     def generate_stream(self, no_video:bool=True):
         """Generates the streamables attributes for a Streamable object.
@@ -158,10 +166,10 @@ class Media:
         if no_video:
             ffmpeg_options['options'] += ' -vn '
 
-        ultimate_source = self.get_ultimate_source(no_video=no_video)
+        ultimate_source = self.get_ultimate_source(no_video=no_video)[-1]
         self._stream = discord.FFmpegPCMAudio(ultimate_source, **ffmpeg_options)
 
-    def get_ultimate_source(self, *, no_video:bool):
+    def get_ultimate_source(self, *, no_video:bool, sizelimit:int=104857600):
         if no_video:
             ydl_options = {'format': 'worseaudio/bestaudio',
                         'noplaylist':True,
@@ -180,18 +188,18 @@ class Media:
         different_source = (format_change_required and not premade_audio_stream)
         is_web_media = self.is_web_media()
 
-        ultimate_source = None
+        ultimate_sources = None
         if ((len(self._info) <= 1 or different_source) and is_web_media):
             with YoutubeDL(ydl_options) as ydl:
                 info = ydl.extract_info(self._source, download=False)
-                url = Media.choose_best_format(info, no_video)
-                ultimate_source = url
+                urls = Media.filter_formats(info, no_video, sizelimit)
+                ultimate_sources = urls
         elif is_web_media and len(self._info) > 1:
-            url = Media.choose_best_format(self._info, no_video)
-            ultimate_source = url
+            urls = Media.filter_formats(self._info, no_video, sizelimit)
+            ultimate_sources = urls
         else:
-            ultimate_source = self._source
-        return ultimate_source
+            ultimate_sources = (self._source,)
+        return ultimate_sources
 
     def get_name(self):
         base = self._name + " "
@@ -249,23 +257,21 @@ class Media:
         return False
 
     @staticmethod
-    def choose_best_format(info:dict, no_video:bool, max_filesize:int=None) -> str:
-        i = 0
+    def filter_formats(info:dict, no_video:bool, max_filesize:int=104857600) -> str:
+        details = {'quality': -1, 'format_note': "", 'filesize': None}
         if not no_video:
-            i = len(info['formats'])-1
-            for fr in info['formats'][::-1]:
-                if 'ext' in fr and 'fps' in fr and 'format_note' in fr:
-                    if fr['ext'] == "mp4" and fr['fps'] != None and fr['format_note'] != "tiny":
-                        if fr['filesize'] != None:
-                            if max_filesize is None:
-                                break
-                            elif fr['filesize'] < max_filesize:
-                                break
-                i -= 1
-                if i == 0:
-                    raise AssertionError("No suitable format found, probably too large")
-        url = info['formats'][i]['url']
-        return url
+            for fr in info['formats']:
+                for detail in details:
+                    if detail not in fr:
+                        fr[detail] = details[detail]
+            arr = info['formats']
+            arr = sorted(info['formats'], key=lambda i: i['quality'], reverse=False)
+            format_condition = lambda x, exts: x['ext'] in exts and "."+x['ext'] in x['url'] and 'DASH' not in x['format_note'] and (x['filesize'] == None or x['filesize'] < max_filesize)
+            video_suggestions = [x['url'] for x in arr if format_condition(x, ("mp4",))]
+            urls = video_suggestions[::-1]
+        else:
+            urls = info['formats'][-1]['url']
+        return urls
 
 # Need to improve on queue editing, design
 # add youtube query

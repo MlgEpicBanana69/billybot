@@ -112,24 +112,25 @@ INSERT INTO sp_user_privileges_tbl
 
 /*
 INSERT INTO sp_tags_tbl (tag) VALUES
-("amogus"),
-("aranara"),
-("better_call_saul"),
-("breaking_bad"),
-("cars_movie"),
-("cbt"),
-("fumo"),
-("lebron_james"),
-("low_quality"),
-("my_child_meme"),
-("one_piece"),
-("osu!"),
-("piracy"),
-("introduction_meme"),
-("speedy_mcqueen"),
-("the_one_piece_is_real"),
-("threat"),
-("touhou")
+("AMOGUS"),
+("ARANARA"),
+("BETTER_CALL_SAUL"),
+("BREAKING_BAD"),
+("CARS_MOVIE"),
+("CBT"),
+("FUMO"),
+("INTRODUCTION_MEME"),
+("LEBRON_JAMES"),
+("LOW_QUALITY"),
+("MY_CHILD_MEME"),
+("ONE_PIECE"),
+("OSU!"),
+("PIRACY"),
+("SPEEDY_MCQUEEN"),
+("THE_ONE_PIECE_IS_REAL"),
+("THREAT"),
+("TOUHOU"),
+("WONDER")
 ;
 */
 

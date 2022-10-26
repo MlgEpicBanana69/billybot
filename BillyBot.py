@@ -228,8 +228,9 @@ async def fetch_file(ctx, src:str):
     await ctx.defer()
     media = bb_media.Media(src)
     try:
-        media.fetch_file()
-        await ctx.respond(content=media.get_name(), file=discord.File(fp=io.BytesIO(media.get_content()), filename=f"{media.get_filename()}"))
+        media.fetch_file(BOT_DISCORD_FILE_LIMIT)
+        await ctx.respond(content=media.get_name())
+        await ctx.respond("", file=discord.File(fp=io.BytesIO(media.get_content()), filename=f"{media.get_filename()}"))
     except:
         raise
 #endregion
@@ -609,7 +610,11 @@ async def sp_list_tags(ctx, contains:str=""):
     contains = str(contains)
     sql_cursor.execute("SELECT tag FROM sp_tags_tbl")
     # NOTE: Try using fetchall
-    await ctx.respond("\n".join([tag for subl in list(sql_cursor) for tag in subl if contains in tag]))
+    tag_list = "\n".join([tag for subl in list(sql_cursor) for tag in subl if contains in tag])
+    if len(tag_list) > 0:
+        await ctx.respond(tag_list)
+    else:
+        await ctx.respond("No tags were found using the given filter.")
 
 @BillyBot.slash_command(name="sp_add_tag")
 async def sp_add_tag(ctx, tag:str):
@@ -620,8 +625,9 @@ async def sp_add_tag(ctx, tag:str):
 
     tag = tag.upper()
     for c in tag:
-        if not (c.isalpha() or c == "_"):
+        if not (c.isalpha() or c.isdigit() or c == "_"):
             await ctx.respond("Illegal character in tag.")
+            return
     try:
         sql_cursor.execute("INSERT INTO sp_tags_tbl (tag) VALUES (%s);", (tag,))
         await ctx.respond(f"Added tag *{tag}* to database.")
