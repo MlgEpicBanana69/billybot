@@ -550,7 +550,7 @@ def sp_has_permission(discord_user_id:str, *, owner:bool=None, administrator:boo
     privilege_names = ("owner", "administrator", "submit", "remove", "rate", "query")
     requested_privileges = dict(zip(privilege_names, (owner, administrator, submit, remove, rate, query)))
 
-    sql_cursor.execute(f"SELECT {', '.join(privilege_names)} FROM user_privileges_view WHERE discord_user_id=\"{discord_user_id}\";")
+    sql_cursor.execute("SELECT %s FROM sp_user_privileges_view WHERE discord_user_id=%s;", (', '.join(privilege_names), discord_user_id))
     privileges = list(sql_cursor)
     if len(privileges) == 0:
         return False, False
@@ -586,15 +586,15 @@ async def sp_modify_user(ctx, discord_user:str, privilege_name:str):
             await ctx.respond("Insufficient user privilege")
             return
 
-    sql_cursor.execute("SELECT name, id FROM user_privileges_tbl;")
+    sql_cursor.execute("SELECT name, id FROM sp_user_privileges_tbl;")
     privilege_dict = dict(list(sql_cursor))
     if privilege_name not in privilege_dict:
         await ctx.respond("Invalid privilege name. See list of valid permissions:\n\n" + "\n".join([str(x) for x in privilege_dict.keys()]))
         return
     if target_has_administrator[1] == False:
-        sql_cursor.execute(f"INSERT INTO users_tbl (discord_user_id, privilege_id) VALUES (\"{target_user}\", \"{privilege_dict[privilege_name]}\");")
+        sql_cursor.execute("INSERT INTO sp_users_tbl (discord_user_id, privilege_id) VALUES (%s, %s);", (target_user, privilege_dict[privilege_name]))
     else:
-        sql_cursor.execute(f"UPDATE users_tbl SET privilege_id=\"{privilege_dict[privilege_name]}\" WHERE discord_user_id=\"{target_user}\"")
+        sql_cursor.execute("UPDATE sp_users_tbl SET privilege_id=%s WHERE discord_user_id=%s", (privilege_dict[privilege_name], target_user))
     await ctx.respond("Completed action")
 
 @BillyBot.slash_command(name="sp_list_tags")
@@ -605,7 +605,8 @@ async def sp_list_tags(ctx, contains:str=""):
     author_has_permission = author_has_permission[0] or not author_has_permission[1]
 
     contains = str(contains)
-    sql_cursor.execute(f"SELECT tag FROM tags_tbl")
+    sql_cursor.execute("SELECT tag FROM sp_tags_tbl")
+    # NOTE: Try using fetchall
     await ctx.respond("\n".join([tag for subl in list(sql_cursor) for tag in subl if contains in tag]))
 
 @BillyBot.slash_command(name="sp_add_tag")
@@ -620,7 +621,7 @@ async def sp_add_tag(ctx, tag:str):
         if not (c.isalpha() or c == "_"):
             await ctx.respond("Illegal character in tag.")
     try:
-        sql_cursor.execute(f"INSERT INTO tags_tbl (tag) VALUES (\"{tag}\");")
+        sql_cursor.execute("INSERT INTO sp_tags_tbl (tag) VALUES (%s);", (tag,))
         await ctx.respond(f"Added tag *{tag}* to database.")
     except mysql.connector.errors.IntegrityError:
         await ctx.respond(f"Failed to add *{tag}* to database, tag already exists!")
@@ -636,7 +637,7 @@ async def sp_pull_by_id(ctx, id:int, show_details:bool=False):
 
     assert type(id) == int
     output_msg = ""
-    sql_cursor.execute(f"SELECT * FROM shitposts_tbl WHERE id={id}")
+    sql_cursor.execute("SELECT * FROM sp_shitposts_tbl WHERE id=%d", (id,))
     shitpost = [key for subl in list(sql_cursor) for key in subl]
     if len(shitpost) == 0:
         await ctx.respond("Shitpost with given ID not found.")
@@ -644,7 +645,7 @@ async def sp_pull_by_id(ctx, id:int, show_details:bool=False):
     shitpost_file = shitpost.pop(1)
     shitpost_file_hash = shitpost.pop(1)
     shitpost_file_ext = shitpost.pop(1)
-    sql_cursor.execute(f"SELECT extension FROM file_extensions_tbl WHERE id={shitpost_file_ext}")
+    sql_cursor.execute("SELECT extension FROM file_extensions_tbl WHERE id=%d", (shitpost_file_ext,))
     shitpost_file_ext = list(sql_cursor)[0]
 
     if show_details:
