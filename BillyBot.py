@@ -7,12 +7,12 @@ from discord.ext import commands
 from discord.utils import get
 import asyncio
 from dotenv import load_dotenv
-
 import cv2
 import numpy as np
 import validators
 import hashlib
 import mysql.connector
+from concurrent.futures import ThreadPoolExecutor
 
 import BillyBot_utils as bb_utils
 import BillyBot_games as bb_games
@@ -36,6 +36,8 @@ load_dotenv()
 intents = discord.Intents.all()
 BillyBot = discord.Bot(intents=intents)
 
+BOT_DISCORD_FILE_LIMIT = bb_media.Media.DISCORD_FILE_LIMITERS[0]
+
 # Every auto list contains a two dimension tuple containing the member id and guild id
 # (id, guild_id)
 auto_say_members = []
@@ -46,7 +48,7 @@ sql_pw = os.environ.get("sql_pw")
 bb_osu = BillyBot_osu(osu_token)
 
 # Connect to the shitposting database
-sql_connection = mysql.connector.connect(user="light", password=sql_pw, host="127.0.0.1", database="shitposting_db")
+sql_connection = mysql.connector.connect(user="light", password=sql_pw, host="127.0.0.1", database="billybot_db")
 sql_connection.autocommit = True
 sql_cursor = sql_connection.cursor()
 
@@ -220,6 +222,17 @@ async def aranara(ctx):
     aranara_choice_name = random.choice(aranara_images)
     with open("resources\\aranara\\" + aranara_choice_name, "rb") as aranara_pick:
         await ctx.respond(file=discord.File(fp=aranara_pick, filename=aranara_choice_name))
+
+@BillyBot.slash_command(name="fetch_file")
+async def fetch_file(ctx, src:str):
+    await ctx.defer()
+    media = bb_media.Media(src)
+    try:
+        media.fetch_file(BOT_DISCORD_FILE_LIMIT)
+        await ctx.respond(content=media.get_name())
+        await ctx.respond("", file=discord.File(fp=io.BytesIO(media.get_content()), filename=f"{media.get_filename()}"))
+    except:
+        raise
 #endregion
 
 #region Chat toggles
@@ -249,33 +262,29 @@ async def wipe(ctx, n: int):
 
 #region Player commands
 @BillyBot.slash_command(name="play")
-async def play(ctx, source):
+async def play(ctx, source:str, speed:float=1.0):
     """Plays audio from an audio source
 
-    # Playing a 'source' goes by a these rules:
-    # 1) An audio file is embeded, play that audio file
-    # 2) A link is requested, depending on where that link leads, fetch the audio file and play it
-    # 3) A query is requested, search that query on youtube and recommand multiple best results
-
-    # also when multiple sources are given, BillyBot takes only the first one
-    # further attachments are *completely* ignored."""
+    # Playing a 'source' goes by these rules:
+    # 1) A link is requested, depending on where that link leads, fetch the audio file and play it
+    # 2) A query is requested, search that query on youtube and recommand multiple best results
+    """
+    await ctx.defer()
     if ctx.author.voice is not None:
-        await join(ctx, False)
+        await bot_join(ctx)
         guild_player = bb_media.Player.get_player(ctx.guild)
+        ultimate_source = None
+
 
         # Source is attachment
         # if len(ctx.message.attachments) > 0:
         #    attachment = ctx.message.attachments[0]
-        #    media = bb_media.Streamable(attachment.url)
-        #    await guild_player.play(media)#
+        #    media = bb_media.Media(attachment.url)
+        #    await guild_player.play(media)
 
-        await ctx.defer()
         # Source is message content
         if validators.url(source):
-            media = bb_media.Streamable(source)
-            await guild_player.play(media)
-            await ctx.respond(media.get_name())
-
+            ultimate_source = source
         # Source is youtube query
         else:
             results = bb_media.Media.query_youtube(source)
@@ -284,9 +293,11 @@ async def play(ctx, source):
             # TODO: Reactive video choosing
             chosen_result = results[0]
 
-            media = bb_media.Streamable(chosen_result[0])
-            await guild_player.play(media)
-            await ctx.respond(f"{chosen_result[1]} added to queue!")
+            ultimate_source = chosen_result[0]
+
+        media = bb_media.Media(ultimate_source, force_audio_only=True, speed=speed)
+        await guild_player.play(media)
+        await ctx.respond(f"{media.get_name()} added to queue!")
     else:
         await ctx.respond("You're not in any voice channel.")
 
@@ -316,11 +327,6 @@ async def skip(ctx):
     await ctx.respond("Skipped")
     guild_player = bb_media.Player.get_player(ctx.guild)
     guild_player.next()
-    queue = guild_player.get_queue()
-    if len(queue) > 0:
-        await ctx.respond(f"Now playing: {str(queue[0])}")
-    else:
-        await ctx.respond("Queue ended, stopped playing.")
 
 @BillyBot.slash_command(name="shuffle")
 async def shuffle(ctx):
@@ -330,6 +336,7 @@ async def shuffle(ctx):
 @BillyBot.slash_command(name="loop")
 async def loop(ctx):
     """Toggles playlist loop on/off"""
+    await ctx.defer()
     loop_state = bb_media.Player.get_player(ctx.guild).toggle_loop()
     loop_state = "ON" if loop_state else "OFF"
     await ctx.respond("Loop is now {0}".format(loop_state))
@@ -353,8 +360,12 @@ async def queue(ctx):
 
 #region Voice commands
 @BillyBot.slash_command(name="join")
-async def join(ctx, respond_on_join=True):
+async def join(ctx):
     """Joins into your voice channel."""
+    await ctx.defer()
+    await bot_join(ctx, True)
+
+async def bot_join(ctx, respond_on_join=False):
     if ctx.author.voice is None:
         await ctx.respond("You're not in any voice channel.")
         return
@@ -391,10 +402,11 @@ async def cyber(ctx, args=""):
     message_sources = _all_ctx_sources(ctx, args)
     img_objects = []
     for i, source in enumerate(message_sources):
-        image_obj = bb_media.Static(source)
+        image_obj = bb_media.Media(source)
         if image_obj is not None:
-            if image_obj.get_route_type() == "generic_image":
-                nparr = np.frombuffer(image_obj(), np.uint8)
+            if image_obj.get_route_type() == bb_media.Media.GENERIC_IMAGE:
+                image_obj.fetch_file(BOT_DISCORD_FILE_LIMIT)
+                nparr = np.frombuffer(image_obj.get_content(), np.uint8)
                 cv2_img = cv2.imdecode(nparr, cv2.IMREAD_UNCHANGED)
                 if len(cv2_img[0][0]) < 4:
                     cv2_img = cv2.cvtColor(cv2_img, cv2.COLOR_RGB2RGBA)
@@ -540,17 +552,18 @@ def sp_has_permission(discord_user_id:str, *, owner:bool=None, administrator:boo
     privilege_names = ("owner", "administrator", "submit", "remove", "rate", "query")
     requested_privileges = dict(zip(privilege_names, (owner, administrator, submit, remove, rate, query)))
 
-    sql_cursor.execute(f"SELECT {', '.join(privilege_names)} FROM user_privileges_view WHERE discord_user_id=\"{discord_user_id}\";")
-    privileges = list(sql_cursor)
-    if len(privileges) == 0:
+    sql_cursor.execute("SELECT %s FROM sp_user_privileges_view WHERE discord_user_id=%s;", (', '.join(privilege_names), discord_user_id))
+    user_privileges = list(sql_cursor)
+    if len(user_privileges) == 0:
         return False, False
-    privileges = dict(zip(privilege_names, privileges[0]))
+    user_privileges = user_privileges[0][0].split(', ')
 
     for privilege_name in privilege_names:
         if requested_privileges[privilege_name] is not None:
+            # False value on owner is None (null)
             if privilege_name == "owner" and requested_privileges[privilege_name] == False:
                 requested_privileges[privilege_name] = None
-            if requested_privileges[privilege_name] != privileges[privilege_name]:
+            if privilege_name not in user_privileges:
                 return False, True
     return True, True
 
@@ -576,15 +589,15 @@ async def sp_modify_user(ctx, discord_user:str, privilege_name:str):
             await ctx.respond("Insufficient user privilege")
             return
 
-    sql_cursor.execute("SELECT name, id FROM user_privileges_tbl;")
+    sql_cursor.execute("SELECT name, id FROM sp_user_privileges_tbl;")
     privilege_dict = dict(list(sql_cursor))
     if privilege_name not in privilege_dict:
         await ctx.respond("Invalid privilege name. See list of valid permissions:\n\n" + "\n".join([str(x) for x in privilege_dict.keys()]))
         return
     if target_has_administrator[1] == False:
-        sql_cursor.execute(f"INSERT INTO users_tbl (discord_user_id, privilege_id) VALUES (\"{target_user}\", \"{privilege_dict[privilege_name]}\");")
+        sql_cursor.execute("INSERT INTO sp_users_tbl (discord_user_id, privilege_id) VALUES (%s, %s);", (target_user, privilege_dict[privilege_name]))
     else:
-        sql_cursor.execute(f"UPDATE users_tbl SET privilege_id=\"{privilege_dict[privilege_name]}\" WHERE discord_user_id=\"{target_user}\"")
+        sql_cursor.execute("UPDATE sp_users_tbl SET privilege_id=%s WHERE discord_user_id=%s", (privilege_dict[privilege_name], target_user))
     await ctx.respond("Completed action")
 
 @BillyBot.slash_command(name="sp_list_tags")
@@ -595,8 +608,13 @@ async def sp_list_tags(ctx, contains:str=""):
     author_has_permission = author_has_permission[0] or not author_has_permission[1]
 
     contains = str(contains)
-    sql_cursor.execute(f"SELECT tag FROM tags_tbl")
-    await ctx.respond("\n".join([tag for subl in list(sql_cursor) for tag in subl if contains in tag]))
+    sql_cursor.execute("SELECT tag FROM sp_tags_tbl")
+    # NOTE: Try using fetchall
+    tag_list = "\n".join([tag for subl in list(sql_cursor) for tag in subl if contains in tag])
+    if len(tag_list) > 0:
+        await ctx.respond(tag_list)
+    else:
+        await ctx.respond("No tags were found using the given filter.")
 
 @BillyBot.slash_command(name="sp_add_tag")
 async def sp_add_tag(ctx, tag:str):
@@ -607,10 +625,11 @@ async def sp_add_tag(ctx, tag:str):
 
     tag = tag.upper()
     for c in tag:
-        if not (c.isalpha() or c == "_"):
+        if not (c.isalpha() or c.isdigit() or c == "_"):
             await ctx.respond("Illegal character in tag.")
+            return
     try:
-        sql_cursor.execute(f"INSERT INTO tags_tbl (tag) VALUES (\"{tag}\");")
+        sql_cursor.execute("INSERT INTO sp_tags_tbl (tag) VALUES (%s);", (tag,))
         await ctx.respond(f"Added tag *{tag}* to database.")
     except mysql.connector.errors.IntegrityError:
         await ctx.respond(f"Failed to add *{tag}* to database, tag already exists!")
@@ -626,7 +645,7 @@ async def sp_pull_by_id(ctx, id:int, show_details:bool=False):
 
     assert type(id) == int
     output_msg = ""
-    sql_cursor.execute(f"SELECT * FROM shitposts_tbl WHERE id={id}")
+    sql_cursor.execute("SELECT * FROM sp_shitposts_tbl WHERE id=%d", (id,))
     shitpost = [key for subl in list(sql_cursor) for key in subl]
     if len(shitpost) == 0:
         await ctx.respond("Shitpost with given ID not found.")
@@ -634,7 +653,7 @@ async def sp_pull_by_id(ctx, id:int, show_details:bool=False):
     shitpost_file = shitpost.pop(1)
     shitpost_file_hash = shitpost.pop(1)
     shitpost_file_ext = shitpost.pop(1)
-    sql_cursor.execute(f"SELECT extension FROM file_extensions_tbl WHERE id={shitpost_file_ext}")
+    sql_cursor.execute("SELECT extension FROM file_extensions_tbl WHERE id=%d", (shitpost_file_ext,))
     shitpost_file_ext = list(sql_cursor)[0]
 
     if show_details:
@@ -728,23 +747,16 @@ async def shitpost(ctx, src:str, tags:str, description:str):
         await ctx.respond("Insufficient user privilege")
         return
 
+    # TODO: DEBUG HERE
     media = bb_media.Media(src)
-    if media._route_type in ("generic_audio", "generic_video", "youtube_media", "generic_image", "generic_image"):
-        if media._route_type != "youtube_media":
-            media = bb_media.Static(src, False)
-        else:
-            media = bb_media.Streamable(src, False)
+    if media.get_route_type() in (bb_media.Media.GENERIC_AUDIO, bb_media.Media.GENERIC_VIDEO, bb_media.Media.GENERIC_IMAGE):
         try:
-            if media._route_type == "youtube_media":
-                media.generate_stream(no_video=False)
-                media._source = media.youtube_src
-                media.extension = "mp4"
-            media.fetch_file(8388608)
+            media.fetch_file(BOT_DISCORD_FILE_LIMIT)
         except AssertionError:
-            await ctx.respond("Source too large for discord (>8MiB)")
+            await ctx.respond(f"Source too large for discord (>~{BOT_DISCORD_FILE_LIMIT//1000000}MiB)")
             return
     else:
-        await ctx.respond("Shitpost src must be an audio/video file or youtube link")
+        await ctx.respond("Shitpost src must be a media compatible type")
         return
 
     try:
@@ -786,7 +798,7 @@ async def shitpost(ctx, src:str, tags:str, description:str):
         shitpost_id = sql_cursor.lastrowid
 
         for tag in tags.split(' '):
-            sql_cursor.execute(f"INSERT INTO shitposting_tags_tbl (tag_id, shitpost_id) VALUES ({tag_list[tag]}, {shitpost_id});")
+            sql_cursor.execute("INSERT INTO shitposting_tags_tbl (tag_id, shitpost_id) VALUES (%d, %d);", (tag_list[tag], shitpost_id))
 
         await ctx.respond("Shitpost uploaded succesfuly.")
     except mysql.connector.errors.IntegrityError:
@@ -817,4 +829,5 @@ https://tenor.com/view/rip-bozo-gif-22294771
         return None
 # endregion
 
-BillyBot.run(discord_token)
+if __name__ == "__main__":
+    BillyBot.run(discord_token)

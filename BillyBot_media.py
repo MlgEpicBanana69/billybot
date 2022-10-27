@@ -2,20 +2,39 @@ import random
 import re
 import requests
 import mimetypes
-mimetypes.init()
-
 import validators
 from youtube_dl import YoutubeDL
 from urllib.parse import urlparse
 import discord
 from discord.utils import get
 
+mimetypes.init()
+
 class Media:
-    def __init__(self, source):
+    GENERIC_IMAGE = "generic_image"
+    GENERIC_VIDEO = "generic_video"
+    GENERIC_AUDIO = "generic_audio"
+    GENERIC_FILE  = "generic_file"
+
+    # Options that seem to work perfectly (?)
+    # ydl_options = {'format': 'bestaudio', 'noplaylist':'True'}
+    FFMPEG_OPTIONS = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5', 'options': '-j'}
+
+    DISCORD_FILE_LIMITERS = (8388608,)
+
+    def __init__(self, source:str, *, speed:float=1.0, force_audio_only:bool=False):
+        assert speed >= 0.5 and speed <= 20.0
+
         self._name = None
         self._content = None
-        # generic_file, generic_video, generic_audio, generic_image, youtube_media
         self._route_type = None
+        self._stream = None
+        self._info = {}
+        self._extension = None
+
+        self.force_audio_only = force_audio_only
+        self.speed = speed
+
         self._source = source
         self.source_route()
         assert self._route_type is not None
@@ -27,16 +46,7 @@ class Media:
         return self.__repr__()
 
     def __repr__(self):
-        return "Media<{0}>".format(self._name)
-
-    def get_name(self):
-        return self._name
-
-    def get_content(self):
-       return self._content
-
-    def get_source(self):
-        return self._source
+        return "BBMedia<{0}>".format(self._name)
 
     @staticmethod
     def query_youtube(query_str, SIZE=10):
@@ -68,55 +78,139 @@ class Media:
     def source_route(self):
         """Sets the Media's _route_type variable"""
 
+        if self.force_audio_only:
+            ydl_options = {'format': 'bestaudio',
+                        'noplaylist': True,
+                        'youtube_include_dash_manifest': False}
+        else:
+            ydl_options = {}
+            #ydl_options = {'format': 'bestvideo+bestaudio/bestaudio/bestvideo[ext=gif]/best',
+            #            'noplaylist':'True',
+            #            'youtube_include_dash_manifest': False}
+
         route = None
         extension = None
+        name = None
+        info = {}
+        force_raw_source = False
         if validators.url(self._source):
-            if self._source.startswith("https://www.youtube.com/watch?v=") or self._source.startswith("https://youtu.be/"):
-                route = "youtube_media"
-            elif self._source.startswith("https://tenor.com/view/"):
-                extension = "gif"
-                route = "generic_image"
-            elif '.' in self._source and '/' in self._source:
+            is_media = self.is_web_media()
+            if is_media:
+                with YoutubeDL(ydl_options) as ydl:
+                    info = ydl.extract_info(self._source, download=False)
+                    if 'entries' in info:
+                        raise AssertionError("Entries in info")
+                        #info = info['entries'][0]
+                        #force_raw_source = True
+                        #self._source = info['url']
+                    else:
+                        if 'formats' in info:
+                            mimestart = f'video/{info["ext"]}'
+                        elif 'thumbnails' in info:
+                            self._source = info['thumbnails'][-1]['url']
+                            mimestart = mimetypes.guess_type(f"{info['id']}.{info['ext']}")[0]
+                        else:
+                            raise AssertionError("osuHOW") # NOTE shouldn't occur
+                    name = info["title"]
+            if (not is_media and ('.' in self._source and '/' in self._source)) or force_raw_source:
                 mimestart = mimetypes.guess_type(urlparse(self._source).path.split('/')[-1])[0]
-                if mimestart is not None:
-                    if mimestart.split('/')[0] in ['video', 'audio', 'image']:
-                        route = "generic_" + mimestart.split('/')[0]
-                        extension = mimestart.split('/')[1]
-                elif len(urlparse(self._source).path.split('/')[-1].split('.')) == 2:
-                    route = "generic_file"
+                name = urlparse(self._source).path.split('/')[-1]
+                info = {"url": self._source, "id": ".".join(name.split('.')[:-1]), "ext": name.split('.')[-1]}
+
+            if mimestart is not None:
+                if mimestart.split('/')[0] in ['video', 'audio', 'image']:
+                    route = "generic_" + mimestart.split('/')[0]
+                    extension = mimestart.split('/')[1]
+            elif len(urlparse(self._source).path.split('/')[-1].split('.')) == 2:
+                route = Media.GENERIC_FILE
         self._route_type = route
-        self.extension = extension
+        self._name = name
+        self._extension = extension
+        self._info = info
 
     def fetch_file(self, size_limit:int=104857600):
         # 100MB
-        resp = requests.get(self._source, stream=True)
-        resp.raise_for_status()
+        ultimate_sources = self.get_ultimate_source(no_video=False, sizelimit=size_limit)
+        for ultimate_source in ultimate_sources:
+            dl_too_large = False
+            resp = requests.get(ultimate_source, stream=True)
+            resp.raise_for_status()
 
-        contents = bytes()
-        # 8MB (8388608)
-        curr_size = 0
-        for chunk in resp.iter_content(8388608):
-            curr_size += len(chunk)
-            if curr_size > size_limit:
-                resp.close()
-                raise ValueError("response too large")
-            contents += chunk
+            contents = bytes()
+            # 4MB (4194304)
+            curr_size = 0
+            for chunk in resp.iter_content(65536):
+                curr_size += len(chunk)
+                if curr_size > size_limit:
+                    resp.close()
+                    dl_too_large = True
+                    break
+                contents += chunk
+            if not dl_too_large:
+                break
+        else:
+            raise ValueError("response too large")
         self._content = contents
 
+
+    def generate_stream(self, no_video:bool=True):
+        """Generates the streamables attributes for a Streamable object.
+           :sets: self._stream
+           :returns: None"""
+
+        assert self.is_streamable()
+
+        ffmpeg_options = Media.FFMPEG_OPTIONS.copy()
+        if self.speed != 1.0:
+            ffmpeg_options['options'] += f' -filter:a "atempo={self.speed}" '
+        if no_video:
+            ffmpeg_options['options'] += ' -vn '
+
+        ultimate_source = self.get_ultimate_source(no_video=no_video)[-1]
+        self._stream = discord.FFmpegPCMAudio(ultimate_source, **ffmpeg_options)
+
+    def get_ultimate_source(self, *, no_video:bool, sizelimit:int=104857600):
+        if no_video:
+            ydl_options = {'format': 'worseaudio/bestaudio',
+                        'noplaylist':True,
+                        'youtube_include_dash_manifest': False}
+        else:
+            ydl_options = {'format': 'bestvideo[ext=mp4]+bestaudio/bestvideo+bestaudio/best',
+                    'noplaylist':True,
+                    'youtube_include_dash_manifest': False}
+
+        #ydl_options = {'format': "bestvideo[filesize<8MiB][ext=mp4]+bestaudio/best",
+        #            'noplaylist':'True',
+        #            'youtube_include_dash_manifest': False}
+
+        format_change_required = (no_video and self._route_type == Media.GENERIC_VIDEO) or (not no_video and self._route_type == Media.GENERIC_AUDIO)
+        premade_audio_stream   = (no_video or self.force_audio_only)
+        different_source = (format_change_required and not premade_audio_stream)
+        is_web_media = self.is_web_media()
+
+        ultimate_sources = None
+        if ((len(self._info) <= 1 or different_source) and is_web_media):
+            with YoutubeDL(ydl_options) as ydl:
+                info = ydl.extract_info(self._source, download=False)
+                urls = Media.filter_formats(info, no_video, sizelimit)
+                ultimate_sources = urls
+        elif is_web_media and len(self._info) > 1:
+            urls = Media.filter_formats(self._info, no_video, sizelimit)
+            ultimate_sources = urls
+        else:
+            ultimate_sources = (self._source,)
+        return ultimate_sources
+
+    def get_name(self):
+        base = self._name + " "
+        if self.speed != 1.0:
+            base += f"({self.speed}x) "
+        base = base[:-1:]
+
+        return base
+
     def get_route_type(self):
-        return self._route_type
-
-class Streamable(Media):
-    def __init__(self, source, gen_stream=True):
-        super().__init__(source)
-        # One time use discord streamable stream object
-        self._stream = None
-        assert self._route_type in ['generic_video', 'generic_audio', 'youtube_media']
-        if gen_stream:
-            self.generate_stream()
-
-    def __call__(self):
-        return self.get_stream()
+       return self._route_type
 
     def get_stream(self):
         if self._stream is None:
@@ -126,75 +220,58 @@ class Streamable(Media):
         self._stream = None
         return temp
 
-    def generate_content(self):
-        self.fetch_file()
+    def get_extension(self):
+        return self._extension
 
     def get_content(self):
-        if self._content is None:
-            self.generate_content()
         return self._content
 
-    def generate_stream(self, no_video=True):
-        """Generates the streamables attributes for a Streamable object.
-           sets self._name and self._stream. This function returns nothing"""
+    def get_source(self):
+        return self._source
 
-        # Options that seem to work perfectly (?)
-        # ydl_options = {'format': 'bestaudio', 'noplaylist':'True'}
-        # ffmpeg_options = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5', 'options': '-vn'}
+    def get_filename(self):
+        return f"{self._info['id']}.{self._info['ext']}"
 
-        ffmpeg_options = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
-                        'options': '-vn'}
-        if no_video:
-            ydl_options = {'format': 'worseaudio/bestaudio',
-                        'noplaylist':'True',
-                        'youtube_include_dash_manifest': False}
+    def is_streamable(self):
+        return self._route_type in (Media.GENERIC_AUDIO, Media.GENERIC_VIDEO)
+
+    def is_web_media(self) -> bool:
+        """
+        Returns true if the media needs to be web proccessed on demand
+        Returns false if the media is to a raw source
+        Also returns false if the media is of web type but the proccesing can be done immediately.
+        This function will silently perform the immediate proccessing.
+        """
+        if validators.url(self._source):
+            if self._source.startswith("https://www.youtube.com/watch?v=") or self._source.startswith("https://youtu.be/"):
+                return True
+            elif self._source.startswith("https://www.reddit.com/"):
+                return True
+            elif self._source.startswith("https://tenor.com/view/"):
+                tenor_resp = requests.get(self._source)
+                matches = re.search("https:\/\/media\.tenor\.com\/.+?\/.+?\.gif", tenor_resp.text)
+                self._source = matches.group(0)
+                return False
+            elif self._source.startswith("https://twitter.com/") and (not "/photo/" in self._source):
+                return True
+        return False
+
+    @staticmethod
+    def filter_formats(info:dict, no_video:bool, max_filesize:int=104857600) -> str:
+        details = {'quality': -1, 'format_note': "", 'filesize': None}
+        if not no_video:
+            for fr in info['formats']:
+                for detail in details:
+                    if detail not in fr:
+                        fr[detail] = details[detail]
+            arr = info['formats']
+            arr = sorted(info['formats'], key=lambda i: i['quality'], reverse=False)
+            format_condition = lambda x, exts: x['ext'] in exts and "."+x['ext'] in x['url'] and 'DASH' not in x['format_note'] and (x['filesize'] == None or x['filesize'] < max_filesize)
+            video_suggestions = [x['url'] for x in arr if format_condition(x, ("mp4",))]
+            urls = video_suggestions[::-1]
         else:
-            ydl_options = {'format': "bestvideo[filesize<=4MiB][ext=mp4]+bestaudio/best",
-                        'noplaylist':'True',
-                        'youtube_include_dash_manifest': False}
-        # That source is a youtube link
-        if self._route_type == "youtube_media":
-            with YoutubeDL(ydl_options) as ydl:
-                info = ydl.extract_info(self._source, download=False)
-                i = 0
-                if not no_video:
-                    i = len(info['formats'])
-                    for fr in info['formats'][::-1]:
-                        if fr['ext'] == "mp4" and fr['fps'] != None and fr['format_note'] != "tiny":
-                            if fr['filesize'] != None and fr['filesize'] < 8388608:
-                                break
-                        i -= 1
-                        if i == 0:
-                            raise AssertionError("No suitable format found, too large")
-                url = info['formats'][i]['url']
-                self.youtube_src = url
-
-                self._name = info['title']
-                self._stream = discord.FFmpegPCMAudio(url, **ffmpeg_options)
-
-        # The source is a link to a file TODO: Implement properly
-        elif self._route_type in ["generic_video", "generic_audio"]:
-            self._name = self._source.split('/')[-1]
-            if no_video:
-                self._stream = discord.FFmpegPCMAudio(self._source, **ffmpeg_options)
-
-    def __repr__(self):
-        "streamableMedia<{0}>".format(self._name)
-
-class Static(Media):
-    def __init__(self, source, gen_content=True):
-        super().__init__(source)
-        if gen_content:
-            self.generate_content()
-
-    def get_content(self):
-        return self._content
-
-    def __repr__(self):
-        "staticMedia<{0}>".format(self._name)
-
-    def generate_content(self):
-        self.fetch_file()
+            urls = info['formats'][-1]['url']
+        return urls
 
 # Need to improve on queue editing, design
 # add youtube query
@@ -240,14 +317,16 @@ class Player:
                     self.get_queue().pop(0)
 
             if len(self.get_queue()) > 0:
-                print("Playing {0} on guild {1}".format(self.get_queue()[0].get_name(), self.get_guild().name))
-                voice.play(self.get_queue()[0](), after=lambda e: self.next())
+                next_song = self.get_queue()[0]
+                print("Playing {0} on guild {1}".format(next_song.get_name(), self.get_guild().name))
+                strm = next_song.get_stream()
+                voice.play(strm, after=lambda e: self.next())
 
     def current_song(self):
         """Returns the name of the current song"""
         return self.get_queue()[0].get_name()
 
-    async def play(self, media:Streamable):
+    async def play(self, media):
         """Adds a Media object to the queue"""
 
         voice = get(self._bot.voice_clients, guild=self._guild)
@@ -258,7 +337,8 @@ class Player:
 
         # Plays now if nothing is playing
         if self._queue[0] == media:
-            voice.play(media.get_stream(), after=lambda e: self.next())
+            strm = media.get_stream()
+            voice.play(strm, after=lambda e: self.next())
 
     async def stop(self):
         """Stops and clears the queue"""
