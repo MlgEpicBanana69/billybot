@@ -8,6 +8,8 @@ from urllib.parse import urlparse
 import discord
 from discord.utils import get
 import ffmpeg
+import os
+import tempfile
 
 mimetypes.init()
 
@@ -132,7 +134,7 @@ class Media:
     def fetch_file(self, size_limit:int=104857600):
         # 100MB
         no_video = self.force_audio_only
-        ultimate_source = self.get_ultimate_source(no_video=no_video, sizelimit=size_limit)
+        ultimate_sources = self.get_ultimate_sources(no_video=no_video, sizelimit=size_limit)
         def download_source(source:str):
             resp = requests.get(source, stream=True)
             resp.raise_for_status()
@@ -148,15 +150,38 @@ class Media:
             return contents
 
         # TODO: add error handling in case fetching file fails
+        # TODO: Change ultimate sources interaction
         if no_video:
-            self._content = download_source(ultimate_source['audio'])
+            self._content = download_source(ultimate_sources['audio'][0])
         else:
             # DO SOME PROCCESSING
-            audio_contents = download_source(ultimate_source['audio'])
-            video_contents = download_source(ultimate_source['video'])
+            audio_contents = download_source(ultimate_sources['audio'][0])
+            video_contents = download_source(ultimate_sources['video'][-1])
 
-            output = ffmpeg.concat(audio_contents, video_contents, v=1, a=1)
-            self._content = output
+            try:
+                audio_tempfile_fd, audio_tempfile_name   = tempfile.mkstemp(suffix=".m4a")
+                video_tempfile_fd, video_tempfile_name   = tempfile.mkstemp(suffix=".mp4")
+                merged_tempfile_fd, merged_tempfile_name = tempfile.mkstemp(suffix=".mp4")
+
+                os.write(audio_tempfile_fd, audio_contents)
+                os.write(video_tempfile_fd, video_contents)
+
+                audio_input = ffmpeg.input(audio_tempfile_name)
+                video_input = ffmpeg.input(video_tempfile_name)
+
+                output = ffmpeg.concat(video_input, audio_input, v=1, a=1)
+                # ffmpeg.output(output, filename=merged_tempfile_name).run()
+                out, err = output.output(f'pipe:{1}', format="video.mp4").run(capture_stdout=True)
+            except:
+                raise
+            finally:
+                os.close(audio_tempfile_fd)
+                os.close(video_tempfile_fd)
+                os.close(merged_tempfile_fd)
+
+
+        return True
+
 
     def generate_stream(self) -> bool:
         """Generates the audio stream for the media object
@@ -172,13 +197,13 @@ class Media:
         if no_video:
             ffmpeg_options['options'] += ' -vn '
 
-        ultimate_source = self.get_ultimate_source(no_video=no_video)
-        if ultimate_source['audio'] is not None:
-            self._stream = discord.FFmpegPCMAudio(ultimate_source['audio'], **ffmpeg_options)
+        ultimate_sources = self.get_ultimate_sources(no_video=no_video)
+        if ultimate_sources['audio'] is not None:
+            self._stream = discord.FFmpegPCMAudio(ultimate_sources['audio'][0], **ffmpeg_options)
             return True
         return False
 
-    def get_ultimate_source(self, *, no_video:bool, sizelimit:int=104857600) -> dict:
+    def get_ultimate_sources(self, *, no_video:bool, sizelimit:int=104857600) -> dict:
         if no_video:
             ydl_options = {'format': 'worseaudio/bestaudio',
                         'noplaylist':True,
@@ -198,13 +223,15 @@ class Media:
                 for detail in details:
                     if detail not in fr:
                         fr[detail] = details[detail]
+                if 'fragment_base_url' in fr:
+                    if fr['url'] != fr['fragment_base_url']:
+                        fr['url'] = fr['fragment_base_url']
 
             arr = self._info['formats']
             arr = sorted(self._info['formats'], key=lambda i: i['quality'], reverse=False)
             def format_condition(x, exts, is_video) -> bool:
-                #format_condition = lambda x, exts: x['ext'] in exts and "."+x['ext'] in x['url'] and 'DASH' not in x['format_note'] and (x['filesize'] == None or x['filesize'] < max_filesize)
                 try:
-                    # assert x['ext'] in exts or len(exts) == 0
+                    assert x['ext'] in exts or len(exts) == 0
                     # assert 'DASH' not in x['format_note']
                     assert x['filesize'] == None or x['filesize'] < sizelimit
                     if 'acodec' in x:
@@ -223,12 +250,12 @@ class Media:
                     return False
 
             # info['formats'][-1]['url']
-            audio_suggestion = [x['url'] for x in arr if format_condition(x, list(), is_video=False)]
+            audio_suggestion = [x['url'] for x in arr if format_condition(x, ('mp4', 'm4a'), is_video=False)]
             if not no_video:
-                video_suggestion = [x['url'] for x in arr if format_condition(x, list())]
+                video_suggestion = [x['url'] for x in arr if format_condition(x, ('mp4', 'm3u8'), is_video=True)]
             else:
                 video_suggestion = []
-                #video_suggestions = [x['url'] for x in arr if format_condition(x, ("mp4",))]
+                # video_suggestions = [x['url'] for x in arr if format_condition(x, ("mp4",))]
             if len(video_suggestion) == 0:
                 video_suggestion = None
             if len(audio_suggestion) == 0:
