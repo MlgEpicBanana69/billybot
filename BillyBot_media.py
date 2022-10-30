@@ -7,6 +7,7 @@ from youtube_dl import YoutubeDL
 from urllib.parse import urlparse
 import discord
 from discord.utils import get
+import ffmpeg
 
 mimetypes.init()
 
@@ -130,12 +131,11 @@ class Media:
 
     def fetch_file(self, size_limit:int=104857600):
         # 100MB
-        ultimate_sources = self.get_ultimate_source(no_video=self.force_audio_only, sizelimit=size_limit)
-        for ultimate_source in ultimate_sources:
-            dl_too_large = False
-            resp = requests.get(ultimate_source, stream=True)
+        no_video = self.force_audio_only
+        ultimate_source = self.get_ultimate_source(no_video=no_video, sizelimit=size_limit)
+        def download_source(source:str):
+            resp = requests.get(source, stream=True)
             resp.raise_for_status()
-
             contents = bytes()
             # 4MB (4194304)
             curr_size = 0
@@ -143,33 +143,42 @@ class Media:
                 curr_size += len(chunk)
                 if curr_size > size_limit:
                     resp.close()
-                    dl_too_large = True
-                    break
+                    return None
                 contents += chunk
-            if not dl_too_large:
-                break
-        else:
-            raise ValueError("response too large")
-        self._content = contents
+            return contents
 
-    def generate_stream(self, no_video:bool=True):
-        """Generates the streamables attributes for a Streamable object.
+        # TODO: add error handling in case fetching file fails
+        if no_video:
+            self._content = download_source(ultimate_source['audio'])
+        else:
+            # DO SOME PROCCESSING
+            audio_contents = download_source(ultimate_source['audio'])
+            video_contents = download_source(ultimate_source['video'])
+
+            output = ffmpeg.concat(audio_contents, video_contents, v=1, a=1)
+            self._content = output
+
+    def generate_stream(self) -> bool:
+        """Generates the audio stream for the media object
            :sets: self._stream
-           :returns: None"""
+           :returns: bool of the function's success"""
 
         assert self.is_streamable()
 
+        no_video = True
         ffmpeg_options = Media.FFMPEG_OPTIONS.copy()
         if self.speed != 1.0:
             ffmpeg_options['options'] += f' -filter:a "atempo={self.speed}" '
         if no_video:
             ffmpeg_options['options'] += ' -vn '
 
-        ultimate_sources = self.get_ultimate_source(no_video=no_video)[0]
-        ultimate_source = ultimate_sources[0]
-        self._stream = discord.FFmpegPCMAudio(ultimate_source, **ffmpeg_options)
+        ultimate_source = self.get_ultimate_source(no_video=no_video)
+        if ultimate_source['audio'] is not None:
+            self._stream = discord.FFmpegPCMAudio(ultimate_source['audio'], **ffmpeg_options)
+            return True
+        return False
 
-    def get_ultimate_source(self, *, no_video:bool, sizelimit:int=104857600):
+    def get_ultimate_source(self, *, no_video:bool, sizelimit:int=104857600) -> dict:
         if no_video:
             ydl_options = {'format': 'worseaudio/bestaudio',
                         'noplaylist':True,
@@ -183,6 +192,49 @@ class Media:
         #            'noplaylist':'True',
         #            'youtube_include_dash_manifest': False}
 
+        def filter_formats() -> str:
+            details = {'quality': -1, 'format_note': "", 'filesize': None}
+            for fr in self._info['formats']:
+                for detail in details:
+                    if detail not in fr:
+                        fr[detail] = details[detail]
+
+            arr = self._info['formats']
+            arr = sorted(self._info['formats'], key=lambda i: i['quality'], reverse=False)
+            def format_condition(x, exts, is_video) -> bool:
+                #format_condition = lambda x, exts: x['ext'] in exts and "."+x['ext'] in x['url'] and 'DASH' not in x['format_note'] and (x['filesize'] == None or x['filesize'] < max_filesize)
+                try:
+                    # assert x['ext'] in exts or len(exts) == 0
+                    # assert 'DASH' not in x['format_note']
+                    assert x['filesize'] == None or x['filesize'] < sizelimit
+                    if 'acodec' in x:
+                        if not is_video:
+                            assert x['acodec'] != 'none'
+                        else:
+                            assert x['acodec'] == 'none'
+                    if 'vcodec' in x:
+                        if is_video:
+                            assert x['vcodec'] != 'none'
+                        else:
+                            assert x['vcodec'] == 'none'
+
+                    return True
+                except AssertionError:
+                    return False
+
+            # info['formats'][-1]['url']
+            audio_suggestion = [x['url'] for x in arr if format_condition(x, list(), is_video=False)]
+            if not no_video:
+                video_suggestion = [x['url'] for x in arr if format_condition(x, list())]
+            else:
+                video_suggestion = []
+                #video_suggestions = [x['url'] for x in arr if format_condition(x, ("mp4",))]
+            if len(video_suggestion) == 0:
+                video_suggestion = None
+            if len(audio_suggestion) == 0:
+                audio_suggestion = None
+            return {'video': video_suggestion, 'audio': audio_suggestion}
+
         format_change_required = (no_video and self._route_type == Media.GENERIC_VIDEO) or (not no_video and self._route_type == Media.GENERIC_AUDIO)
         premade_audio_stream   = (no_video or self.force_audio_only)
         different_source = (format_change_required and not premade_audio_stream)
@@ -191,11 +243,11 @@ class Media:
         ultimate_sources = None
         if ((len(self._info) <= 1 or different_source) and is_web_media):
             with YoutubeDL(ydl_options) as ydl:
-                info = ydl.extract_info(self._source, download=False)
-                urls = Media.filter_formats(info, no_video, sizelimit)
+                self._info = ydl.extract_info(self._source, download=False)
+                urls = filter_formats()
                 ultimate_sources = urls
         elif is_web_media and len(self._info) > 1:
-            urls = Media.filter_formats(self._info, no_video, sizelimit)
+            urls = filter_formats()
             ultimate_sources = urls
         else:
             ultimate_sources = (self._source,)
@@ -255,41 +307,6 @@ class Media:
             elif self._source.startswith("https://twitter.com/") and (not "/photo/" in self._source):
                 return True
         return False
-
-    @staticmethod
-    def filter_formats(info:dict, no_video:bool, max_filesize:int=104857600) -> str:
-        details = {'quality': -1, 'format_note': "", 'filesize': None}
-        for fr in info['formats']:
-            for detail in details:
-                if detail not in fr:
-                    fr[detail] = details[detail]
-
-        arr = info['formats']
-        arr = sorted(info['formats'], key=lambda i: i['quality'], reverse=False)
-        def format_condition(x, exts):
-            #format_condition = lambda x, exts: x['ext'] in exts and "."+x['ext'] in x['url'] and 'DASH' not in x['format_note'] and (x['filesize'] == None or x['filesize'] < max_filesize)
-            try:
-                assert x['ext'] in exts or len(exts) == 0
-                # assert 'DASH' not in x['format_note']
-                assert x['filesize'] == None or x['filesize'] < max_filesize
-                if 'acodec' in x:
-                    assert x['acodec'] != 'none'
-                if 'vcodec' in x:
-                    if no_video:
-                        assert x['vcodec'] == 'none'
-                    else:
-                        assert x['vcodec'] != 'none'
-
-                return True
-            except AssertionError:
-                return False
-
-        # info['formats'][-1]['url']
-        if no_video:
-            video_suggestions = [x['url'] for x in arr if format_condition(x, list())]
-        else:
-            video_suggestions = [x['url'] for x in arr if format_condition(x, ("mp4",))]
-        return video_suggestions[::-1]
 
 # Need to improve on queue editing, design
 # add youtube query
