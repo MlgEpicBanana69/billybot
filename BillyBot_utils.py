@@ -1,4 +1,5 @@
 import numpy as np
+import win32pipe, win32file, pywintypes
 
 # https://en.wikipedia.org/wiki/Alpha_compositing
 def merge_pixels(foreground, background):
@@ -29,6 +30,31 @@ def merge_pixels(foreground, background):
                     * background_alpha * (1 - foreground_alpha)) / merged_alpha
     return np.array([int(merged_red * 255), int(merged_green * 255),
                      int(merged_blue * 255), int(merged_alpha * 255)])
+
+class NamedPipe():
+    def __init__(self, name:str, chunk_size=65536):
+        self.name = name
+        self.pipe = win32pipe.CreateNamedPipe(
+            f'\\\\.\\pipe\\{name}',
+            win32pipe.PIPE_ACCESS_OUTBOUND,
+            win32pipe.PIPE_TYPE_MESSAGE | win32pipe.PIPE_WAIT,
+            1,
+            chunk_size,
+            chunk_size,
+            300,
+            None
+        )
+        # win32pipe.ConnectNamedPipe(self.pipe, None)
+
+    def stream_to_pipe(self, data:bytes):
+        try:
+            win32pipe.ConnectNamedPipe(self.pipe, None)
+            win32file.WriteFile(self.pipe, data)
+        except:
+            raise
+        finally:
+            print("Pipe close!!")
+            win32file.CloseHandle(self.pipe)
 
 #region discord
 def discord_mention_to_user_id(ctx, discord_mention:str):
