@@ -250,15 +250,27 @@ async def saytoggle(ctx):
 # endregion
 
 #region Server managment commands
-@BillyBot.slash_command(name="wipe")
+@BillyBot.slash_command(name="purge")
 @commands.has_permissions(manage_messages=True)
-async def wipe(ctx, n: int):
+async def purge(ctx, n:int=None, before:str=None):
     """Deletes n meesages from the current text channel"""
     await ctx.defer()
-    history = await ctx.channel.history(limit=n+1).flatten()
-    for msg in history[1::]:
-        await msg.delete()
-    await ctx.respond(f"Deleted {len(history[1::])} messages.", delete_after=5)
+    if n is not None:
+        await ctx.channel.purge(limit=n, after=ctx.message)
+    elif before is not None:
+        try:
+            before = int(before)
+            await ctx.channel.purge(limit=5, before=before, after=ctx.message)
+        except TypeError:
+            await ctx.channel.send("Invalid input for 'before'.")
+    else:
+        await ctx.channel.send("Invalid input. Only one input allowed.")
+
+    # history = await ctx.channel.history(limit=n+1).flatten()
+    # for msg in history[1::]:
+    #     await msg.delete()
+    # await ctx.respond(f"Deleted {len(history[1::])} messages.", delete_after=5)
+    await ctx.respond(f"Deleted {n} messages.", delete_after=5)
 # endregion
 
 #region Player commands

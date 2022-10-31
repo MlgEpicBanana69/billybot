@@ -10,6 +10,7 @@ from discord.utils import get
 import ffmpeg
 import os
 import tempfile
+import threading
 
 mimetypes.init()
 
@@ -18,10 +19,11 @@ class Media:
     GENERIC_VIDEO = "generic_video"
     GENERIC_AUDIO = "generic_audio"
     GENERIC_FILE  = "generic_file"
+    TEMPFILE_LOCK = threading.Lock()
 
     # Options that seem to work perfectly (?)
     # ydl_options = {'format': 'bestaudio', 'noplaylist':'True'}
-    FFMPEG_OPTIONS = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5', 'options': ''}
+    STREAM_FFMPEG_OPTIONS = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5', 'options': ''}
 
     DISCORD_FILE_LIMITERS = (8388608,)
 
@@ -152,13 +154,14 @@ class Media:
         # TODO: add error handling in case fetching file fails
         # TODO: Change ultimate sources interaction
         if no_video:
-            self._content = download_source(ultimate_sources['audio'][0])
+            output_data = download_source(ultimate_sources['audio'][0])
         else:
             # DO SOME PROCCESSING
             audio_contents = download_source(ultimate_sources['audio'][0])
             video_contents = download_source(ultimate_sources['video'][-1])
 
             try:
+                Media.TEMPFILE_LOCK.acquire()
                 audio_tempfile_fd, audio_tempfile_name   = tempfile.mkstemp(suffix=".m4a")
                 video_tempfile_fd, video_tempfile_name   = tempfile.mkstemp(suffix=".mp4")
                 merged_tempfile_fd, merged_tempfile_name = tempfile.mkstemp(suffix=".mp4")
@@ -166,22 +169,23 @@ class Media:
                 os.write(audio_tempfile_fd, audio_contents)
                 os.write(video_tempfile_fd, video_contents)
 
-                audio_input = ffmpeg.input(audio_tempfile_name)
-                video_input = ffmpeg.input(video_tempfile_name)
+                input_audio = ffmpeg.input(audio_tempfile_name)
+                input_video = ffmpeg.input(video_tempfile_name)
 
-                output = ffmpeg.concat(video_input, audio_input, v=1, a=1)
-                # ffmpeg.output(output, filename=merged_tempfile_name).run()
-                out, err = output.output(f'pipe:{1}', format="video.mp4").run(capture_stdout=True)
-            except:
-                raise
+                ffmpeg.concat(input_video, input_audio, v=1, a=1).output(merged_tempfile_name, loglevel="quiet").run(overwrite_output=True, )
+
+                with open(merged_tempfile_name, "rb") as tfile:
+                    output_data = tfile.read()
             finally:
                 os.close(audio_tempfile_fd)
                 os.close(video_tempfile_fd)
                 os.close(merged_tempfile_fd)
-
-
+                os.remove(audio_tempfile_name)
+                os.remove(video_tempfile_name)
+                os.remove(merged_tempfile_name)
+                Media.TEMPFILE_LOCK.release()
+        self._content = output_data
         return True
-
 
     def generate_stream(self) -> bool:
         """Generates the audio stream for the media object
@@ -191,7 +195,7 @@ class Media:
         assert self.is_streamable()
 
         no_video = True
-        ffmpeg_options = Media.FFMPEG_OPTIONS.copy()
+        ffmpeg_options = Media.STREAM_FFMPEG_OPTIONS.copy()
         if self.speed != 1.0:
             ffmpeg_options['options'] += f' -filter:a "atempo={self.speed}" '
         if no_video:
