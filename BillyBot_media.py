@@ -153,20 +153,6 @@ class Media:
                 contents += chunk
             return contents
 
-        def writer(data, pipe_name, chunk_size=8192):
-            # Open the pipes as opening files (open for "open for writing only").
-            # fd_pipe1 is a file descriptor (an integer)
-            fd_pipe = os.open(pipe_name, os.O_WRONLY)
-
-            for i in range(0, len(data), chunk_size):
-                # Write to named pipe as writing to a file
-                # Write bytes of data to fd_pipe
-                os.write(fd_pipe, data[i: chunk_size + i])
-                # TODO: add error handling in case fetching file fails
-                # TODO: Change ultimate sources interaction
-            # Closing the pipes as closing files.
-            os.close(fd_pipe)
-
         if no_video:
             self._content = download_source(ultimate_sources['audio'][0])
         else:
@@ -175,34 +161,24 @@ class Media:
             video_contents = download_source(ultimate_sources['video'][-1])
 
             # Create named pipes
-            # video_pipe = NamedPipe("videopipe")
-            # audio_pipe = NamedPipe("audiopipe")
-            video_pipe = os.mkfifo("videopipe")
-            audio_pipe = os.mkfifo("audiopipe")
+            video_pipe = NamedPipe("video_pipe.mp4")
+            audio_pipe = NamedPipe("audio_pipe.m4a")
 
             # Create ffmpeg-python streams
-            input_video = ffmpeg.input("pipe:videopipe")
-            input_audio = ffmpeg.input("pipe:audiopipe")
-
-            #args = (ffmpeg
-            #        .input("pipe:")
-            #        # incredible
-            #        .output("pipe:")
-            #        .get_args()
-            #        )
+            input_video = ffmpeg.input(f"pipe:{video_pipe.name}")
+            input_audio = ffmpeg.input(f"pipe:{audio_pipe.name}")
 
             args = ffmpeg.concat(input_video, input_audio, v=1, a=1).output("pipe:").get_args()
+
             proc = subprocess.Popen(["ffmpeg"] + args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 
-            #thread1 = threading.Thread(target=video_pipe.stream_to_pipe, args=(video_contents,))
-            #thread2 = threading.Thread(target=audio_pipe.stream_to_pipe, args=(audio_contents,))
-            thread1 = threading.Thread(target=writer, args=(video_contents, video_pipe))
-            thread2 = threading.Thread(target=writer, args=(audio_contents, audio_pipe))
+            thread1 = threading.Thread(target=video_pipe.stream_to_pipe, args=(video_contents,))
+            thread2 = threading.Thread(target=audio_pipe.stream_to_pipe, args=(audio_contents,))
 
             thread1.start()
-            thread2.start()
-
             thread1.join()
+
+            thread2.start()
             thread2.join()
 
             proc.wait()
@@ -210,7 +186,6 @@ class Media:
             output_data = proc.stdout.read()
             self._content = output_data
         return True
-
 
     def generate_stream(self) -> bool:
         """Generates the audio stream for the media object

@@ -36,25 +36,23 @@ class NamedPipe():
         self.name = name
         self.pipe = win32pipe.CreateNamedPipe(
             f'\\\\.\\pipe\\{name}',
-            win32pipe.PIPE_ACCESS_OUTBOUND,
+            win32pipe.PIPE_ACCESS_DUPLEX,
             win32pipe.PIPE_TYPE_MESSAGE | win32pipe.PIPE_WAIT,
             1,
             chunk_size,
             chunk_size,
-            300,
+            0,
             None
         )
-        # win32pipe.ConnectNamedPipe(self.pipe, None)
 
     def stream_to_pipe(self, data:bytes):
         try:
+            # res = win32pipe.SetNamedPipeHandleState(self.pipe, win32pipe.PIPE_READMODE_BYTE, None, None)
             win32pipe.ConnectNamedPipe(self.pipe, None)
             win32file.WriteFile(self.pipe, data)
-        except:
-            raise
-        finally:
-            print("Pipe close!!")
+        except Exception as e:
             win32file.CloseHandle(self.pipe)
+            raise e
 
 #region discord
 def discord_mention_to_user_id(ctx, discord_mention:str):
