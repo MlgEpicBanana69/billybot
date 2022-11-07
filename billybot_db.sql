@@ -73,7 +73,7 @@ CREATE TABLE sp_shitposts_tags_tbl(
 	CONSTRAINT FK_tagID_shitpostingTags
 		FOREIGN KEY(tag_id) REFERENCES sp_tags_tbl(id)
 		ON UPDATE CASCADE
-		ON DELETE CASCADE,
+		ON DELETE RESTRICT,
 	CONSTRAINT FK_shitpostID_shitpostingTags
 		FOREIGN KEY(shitpost_id) REFERENCES shitposts_tbl(id)
 		ON UPDATE CASCADE

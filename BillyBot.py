@@ -664,13 +664,21 @@ async def sp_add_tag(ctx, tag:str):
     except mysql.connector.errors.IntegrityError:
         await ctx.respond(f"Failed to add *{tag}* to database, tag already exists!")
 
-@BillyBot.slash_command(name="sp_remove_tag")
-async def sp_remove_tag(ctx, tag:str):
+@BillyBot.slash_command(name="sp_delete_tag")
+async def sp_delete_tag(ctx, tag:str):
+    await ctx.defer()
     if not sp_has_permission(str(ctx.author.id), remove=True)[0]:
         await ctx.respond("Insufficient user privilege")
         return
 
-    
+    tag = tag.upper()
+    if not sp_valid_tag(tag):
+        await ctx.respond("Invalid tag")
+        return
+
+    sql_cursor.execute("DELETE FROM sp_tags_tbl WHERE tag=%s", (tag,))
+    sql_connection.commit()
+    await ctx.respond(f"Deleted tag *{tag}*")
 
 @BillyBot.slash_command(name="sp_pull_by_id")
 async def sp_pull_by_id(ctx, id:int, show_details:bool=False):
@@ -691,9 +699,9 @@ async def sp_pull_by_id(ctx, id:int, show_details:bool=False):
     shitpost_file_hash = shitpost.pop(1)
     shitpost_file_ext = shitpost.pop(1)
     sql_cursor.execute("SELECT extension FROM sp_file_extensions_tbl WHERE id=%s", (shitpost_file_ext,))
-    shitpost_file_ext = list(sql_cursor)[0]
+    shitpost_file_ext = list(sql_cursor)[0][0]
 
-    shitpost_file = open(f"resources/shitposts/shitpost{id}.{shitpost_file_ext}", "rb")
+    shitpost_file = open(f"resources/dynamic/shitposts/shitpost{id}.{shitpost_file_ext}", "rb")
 
     if show_details:
         shitpost = dict(zip(("id", "submitter", "description"), shitpost))
@@ -773,9 +781,16 @@ async def sp_pull(ctx, tags:str=None, keyphrase:str=None):
 
     await ctx.respond(f"{output}")
 
-@BillyBot.slash_command(name="sp_remove_shitpost")
-async def sp_remove_shitpost(ctx, id:int):
-    pass
+@BillyBot.slash_command(name="sp_delete_shitpost")
+async def sp_delete_shitpost(ctx, id:int):
+    await ctx.defer()
+    if not sp_has_permission(str(ctx.author.id), remove=True)[0]:
+        await ctx.respond("Insufficient user privilege")
+        return
+
+    sql_cursor.execute("DELETE FROM shitposts_tbl WHERE id=%s", (id,))
+    sql_connection.commit()
+    await ctx.respond(f"Deleted shitpost {id}")
 
 @BillyBot.slash_command(name="shitpost")
 async def shitpost(ctx, src:str, tags:str, description:str):
@@ -839,7 +854,7 @@ async def shitpost(ctx, src:str, tags:str, description:str):
         for tag in tags:
             sql_cursor.execute("INSERT INTO sp_shitposts_tags_tbl (tag_id, shitpost_id) VALUES (%s, %s);", (tag_list[tag], shitpost_id))
 
-        with open(f"resources/shitposts/shitpost{shitpost_id}.{media_extension}", "wb") as shitpost_file:
+        with open(f"resources/dynamic/shitposts/shitpost{shitpost_id}.{media_extension}", "wb") as shitpost_file:
             shitpost_file.write(media_contents)
 
         sql_connection.commit()
