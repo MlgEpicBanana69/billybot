@@ -49,7 +49,6 @@ bb_osu = BillyBot_osu(osu_token)
 
 # Connect to the shitposting database
 sql_connection = mysql.connector.connect(user="light", password=sql_pw, host="127.0.0.1", database="billybot_db")
-sql_connection.autocommit = True
 sql_cursor = sql_connection.cursor()
 
 #region Bot events
@@ -204,23 +203,23 @@ async def dolev(ctx, equation):
 @BillyBot.slash_command(name="bibi")
 async def bibi(ctx):
     """Sends a picture of Israel's **EX** prime minister Benjamin Netanyahu."""
-    bb_images = os.listdir("resources\\bibi\\")
-    with open("resources\\bibi\\" + random.choice(bb_images), "rb") as bb_pick:
+    bb_images = os.listdir("resources\\static\\bibi\\")
+    with open("resources\\static\\bibi\\" + random.choice(bb_images), "rb") as bb_pick:
         await ctx.respond(file=discord.File(fp=bb_pick, filename="bb.png"))
 
 @BillyBot.slash_command(name="ofekganor")
 async def ofekganor(ctx):
     """Sends a picture of Lord Ofek Ganor in his full glory"""
-    ofek_images = os.listdir("resources\\ofekganor\\")
-    with open("resources\\ofekganor\\" + random.choice(ofek_images), "rb") as ofek_pick:
+    ofek_images = os.listdir("resources\\static\\ofekganor\\")
+    with open("resources\\static\\ofekganor\\" + random.choice(ofek_images), "rb") as ofek_pick:
         await ctx.respond(file=discord.File(fp=ofek_pick, filename="ofek.png"))
 
 @BillyBot.slash_command(name="aranara")
 async def aranara(ctx):
     """Sends a picture of an aranara"""
-    aranara_images = os.listdir("resources\\aranara\\")
+    aranara_images = os.listdir("resources\\static\\aranara\\")
     aranara_choice_name = random.choice(aranara_images)
-    with open("resources\\aranara\\" + aranara_choice_name, "rb") as aranara_pick:
+    with open("resources\\static\\aranara\\" + aranara_choice_name, "rb") as aranara_pick:
         await ctx.respond(file=discord.File(fp=aranara_pick, filename=aranara_choice_name))
 
 @BillyBot.slash_command(name="fetch_file")
@@ -435,7 +434,7 @@ async def cyber(ctx, args=""):
     # processing and final sending goes here!
     for current_img in img_objects:
         foreground_image = cv2.imread(
-            "resources\\foreground.png", cv2.IMREAD_UNCHANGED)
+            "resources\\static\\foreground.png", cv2.IMREAD_UNCHANGED)
         foreground_img_ratio = foreground_image.shape[1] / \
             foreground_image.shape[0]
         if current_img.shape[1] >= current_img.shape[0]:
@@ -577,9 +576,23 @@ def sp_has_permission(discord_user_id:str, *, owner:bool=None, administrator:boo
             # False value on owner is None (null)
             if privilege_name == "owner" and requested_privileges[privilege_name] == False:
                 requested_privileges[privilege_name] = None
-            if privilege_name not in user_privileges:
+            if (privilege_name not in user_privileges) == bool(requested_privileges[privilege_name]):
                 return False, True
     return True, True
+
+def sp_valid_tag(tag:str) -> bool:
+    for c in tag:
+        if not(c.isalpha() or c == "_" or c.isdigit()):
+            return False
+    return True
+
+def sp_valid_description(description:str) -> bool:
+    if len(description) < 16 or len(description) > 255:
+        return False
+    for c in description:
+        if ord(c) < 32 or ord(c) > 126:
+            return False
+    return True
 
 @BillyBot.slash_command(name="sp_modify_user")
 async def sp_modify_user(ctx, discord_user:str, privilege_name:str):
@@ -612,19 +625,21 @@ async def sp_modify_user(ctx, discord_user:str, privilege_name:str):
         sql_cursor.execute("INSERT INTO sp_users_tbl (discord_user_id, privilege_id) VALUES (%s, %s);", (target_user, privilege_dict[privilege_name]))
     else:
         sql_cursor.execute("UPDATE sp_users_tbl SET privilege_id=%s WHERE discord_user_id=%s", (privilege_dict[privilege_name], target_user))
+    sql_connection.commit()
     await ctx.respond("Completed action")
 
 @BillyBot.slash_command(name="sp_list_tags")
-async def sp_list_tags(ctx, contains:str=""):
+async def sp_list_tags(ctx, contains:str="", startswith:str=""):
     """Sends a list of legal tags that contains the given string"""
     await ctx.defer()
     author_has_permission = sp_has_permission(str(ctx.author.id), query=True)
     author_has_permission = author_has_permission[0] or not author_has_permission[1]
 
-    contains = str(contains)
+    contains = contains.upper()
+    startswith = startswith.upper()
     sql_cursor.execute("SELECT tag FROM sp_tags_tbl")
     # NOTE: Try using fetchall
-    tag_list = "\n".join([tag for subl in list(sql_cursor) for tag in subl if contains in tag])
+    tag_list = "\n".join([tag for subl in list(sql_cursor) for tag in subl if (contains in tag) and (tag.startswith(startswith))])
     if len(tag_list) > 0:
         await ctx.respond(tag_list)
     else:
@@ -644,31 +659,41 @@ async def sp_add_tag(ctx, tag:str):
             return
     try:
         sql_cursor.execute("INSERT INTO sp_tags_tbl (tag) VALUES (%s);", (tag,))
+        sql_connection.commit()
         await ctx.respond(f"Added tag *{tag}* to database.")
     except mysql.connector.errors.IntegrityError:
         await ctx.respond(f"Failed to add *{tag}* to database, tag already exists!")
+
+@BillyBot.slash_command(name="sp_remove_tag")
+async def sp_remove_tag(ctx, tag:str):
+    if not sp_has_permission(str(ctx.author.id), remove=True)[0]:
+        await ctx.respond("Insufficient user privilege")
+        return
+
+    
 
 @BillyBot.slash_command(name="sp_pull_by_id")
 async def sp_pull_by_id(ctx, id:int, show_details:bool=False):
     """Pulls a shitpost by its ID"""
     await ctx.defer()
-    insufficient_privileges = sp_has_permission(str(ctx.author.id), query=False)
+    insufficient_privileges = sp_has_permission(str(ctx.author.id), query=False) # Check if user cannot query
     if insufficient_privileges[0] or not insufficient_privileges[1]:
         await ctx.respond("Insufficient privileges")
         return
 
     assert type(id) == int
     output_msg = ""
-    sql_cursor.execute("SELECT * FROM sp_shitposts_tbl WHERE id=%d", (id,))
+    sql_cursor.execute("SELECT * FROM shitposts_tbl WHERE id=%s", (id,))
     shitpost = [key for subl in list(sql_cursor) for key in subl]
     if len(shitpost) == 0:
         await ctx.respond("Shitpost with given ID not found.")
         return
-    shitpost_file = shitpost.pop(1)
     shitpost_file_hash = shitpost.pop(1)
     shitpost_file_ext = shitpost.pop(1)
-    sql_cursor.execute("SELECT extension FROM file_extensions_tbl WHERE id=%d", (shitpost_file_ext,))
+    sql_cursor.execute("SELECT extension FROM sp_file_extensions_tbl WHERE id=%s", (shitpost_file_ext,))
     shitpost_file_ext = list(sql_cursor)[0]
+
+    shitpost_file = open(f"resources/shitposts/shitpost{id}.{shitpost_file_ext}", "rb")
 
     if show_details:
         shitpost = dict(zip(("id", "submitter", "description"), shitpost))
@@ -677,7 +702,8 @@ async def sp_pull_by_id(ctx, id:int, show_details:bool=False):
             output_msg += f"{key}: {value}\n"
         output_msg += f"hash: {shitpost_file_hash}"
 
-    await ctx.respond(output_msg, file=discord.File(fp=io.BytesIO(shitpost_file), filename=f"shitpost{id}.{shitpost_file_ext}"))
+    await ctx.respond(output_msg, file=discord.File(fp=shitpost_file, filename=f"shitpost{id}.{shitpost_file_ext}"))
+    shitpost_file.close()
 
 @BillyBot.slash_command(name="sp_pull")
 async def sp_pull(ctx, tags:str=None, keyphrase:str=None):
@@ -700,7 +726,7 @@ async def sp_pull(ctx, tags:str=None, keyphrase:str=None):
             await ctx.respond("Could not find shitpost with given tags and keyphrase")
             return
         elif len(keyword_filter) == 0:
-            with open("resources/conjuctions.txt", "r") as conjuction_file:
+            with open("resources/staticconjuctions.txt", "r") as conjuction_file:
                 conjuction_words = conjuction_file.read().split('\n')
             for sp_id, sp_desc in shitpost_descriptions.items():
                 for part in keyphrase.split(' '):
@@ -747,6 +773,10 @@ async def sp_pull(ctx, tags:str=None, keyphrase:str=None):
 
     await ctx.respond(f"{output}")
 
+@BillyBot.slash_command(name="sp_remove_shitpost")
+async def sp_remove_shitpost(ctx, id:int):
+    pass
+
 @BillyBot.slash_command(name="shitpost")
 async def shitpost(ctx, src:str, tags:str, description:str):
     """
@@ -754,8 +784,7 @@ async def shitpost(ctx, src:str, tags:str, description:str):
     Requires submit privilege
     """
     await ctx.defer()
-    tags = tags.upper()
-    description = description.lower()
+    tags = tags.upper().split(' ')
 
     if not sp_has_permission(str(ctx.author.id), submit=True)[0]:
         await ctx.respond("Insufficient user privilege")
@@ -778,43 +807,43 @@ async def shitpost(ctx, src:str, tags:str, description:str):
         tag_list = list(sql_cursor)
         assert len(tag_list) > 0
         tag_list = dict(tag_list)
-        for tag in tags.split(' '):
-            for c in tag:
-                assert c.isalpha() or c == "_" or c.isdigit()
+        for tag in tags:
+            assert sp_valid_tag(tag)
             assert tag in tag_list
     except AssertionError:
-        await ctx.respond("Invalid flags")
+        await ctx.respond("Invalid tags")
         return
 
-    try:
-        assert len(description) > 16 and len(description) <= 255
-        for c in description:
-            assert c.isalpha() or c.isdigit() or c in (' ', "'", ',', ".", "!", "_", "-")
-    except AssertionError:
+    if not sp_valid_description(description):
         await ctx.respond("Invalid description. Length must be in (16-255) inclusive")
         return
 
     sql_cursor.execute("SELECT extension, id FROM sp_file_extensions_tbl;")
     legal_file_extensions = dict(list(sql_cursor))
+    media_extension = media.get_file_extension()
     try:
         assert len(legal_file_extensions) > 0
-        assert media.extension in legal_file_extensions
+        assert media_extension in legal_file_extensions
     except AssertionError:
         await ctx.respond("Illegal file extension")
         return
-    sql_insert_blob_query = """ INSERT INTO shitposts_tbl
-                          (file, file_hash, file_extension_id, submitter_id, description) VALUES (%s,%s,%s,%s,%s);"""
+    sql_insert_blob_query = """INSERT INTO shitposts_tbl
+                          (file_hash, file_extension_id, submitter_id, description) VALUES (%s,%s,%s,%s);"""
     media_contents = media.get_content()
     media_hash = hashlib.sha256(media_contents).hexdigest()
-    insert_blob_tuple = (media_contents, media_hash, legal_file_extensions[media.extension], ctx.author.id, description)
+    insert_blob_tuple = (media_hash, legal_file_extensions[media_extension], ctx.author.id, description)
     try:
         sql_cursor.execute(sql_insert_blob_query, insert_blob_tuple)
         shitpost_id = sql_cursor.lastrowid
 
-        for tag in tags.split(' '):
-            sql_cursor.execute("INSERT INTO sp_shitposting_tags_tbl (tag_id, shitpost_id) VALUES (%d, %d);", (tag_list[tag], shitpost_id))
+        for tag in tags:
+            sql_cursor.execute("INSERT INTO sp_shitposts_tags_tbl (tag_id, shitpost_id) VALUES (%s, %s);", (tag_list[tag], shitpost_id))
 
-        await ctx.respond("Shitpost uploaded succesfuly.")
+        with open(f"resources/shitposts/shitpost{shitpost_id}.{media_extension}", "wb") as shitpost_file:
+            shitpost_file.write(media_contents)
+
+        sql_connection.commit()
+        await ctx.respond(f"Shitpost uploaded succesfuly. (id: {shitpost_id})")
     except mysql.connector.errors.IntegrityError:
         await ctx.respond("Shitpost already exists within database!")
 #endregion
@@ -822,7 +851,7 @@ async def shitpost(ctx, src:str, tags:str, description:str):
 #region intimidation responses
 def cyber_intimidation(message, keyphrase):
     insults = None
-    with open("resources/billy_insults.txt", mode="r", encoding='utf-8') as f:
+    with open("resources/staticbilly_insults.txt", mode="r", encoding='utf-8') as f:
         insults = f.read().split('\n')
     for insult in insults:
         if insult in keyphrase:

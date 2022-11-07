@@ -47,7 +47,6 @@ CREATE TABLE sp_users_tbl(
 
 CREATE TABLE shitposts_tbl(
 	id INT NOT NULL AUTO_INCREMENT,
-	file MEDIUMBLOB NOT NULL,
 	file_hash VARCHAR(64) NOT NULL,
 	file_extension_id INT NOT NULL,
 	submitter_id VARCHAR(18) NOT NULL,
@@ -108,12 +107,13 @@ INSERT INTO sp_user_privileges_tbl
 ("user", NULL, FALSE, FALSE, FALSE, FALSE, TRUE),
 ("banned", NULL, FALSE, FALSE, FALSE, FALSE, FALSE);
 
-# INSERT INTO sp_users 238834017980514304
+INSERT INTO sp_users_tbl (discord_user_id, privilege_id) VALUES ("238834017980514304", 1);
 
-/*
 INSERT INTO sp_tags_tbl (tag) VALUES
+("8_BIT"),
 ("AMOGUS"),
 ("ARANARA"),
+("BAD_APPLE"),
 ("BETTER_CALL_SAUL"),
 ("BREAKING_BAD"),
 ("CARS_MOVIE"),
@@ -122,20 +122,27 @@ INSERT INTO sp_tags_tbl (tag) VALUES
 ("INTRODUCTION_MEME"),
 ("LEBRON_JAMES"),
 ("LOW_QUALITY"),
+("MUSIC"),
 ("MY_CHILD_MEME"),
+("OMORI"),
 ("ONE_PIECE"),
-("OSU!"),
+("OSUGAME"),
 ("PIRACY"),
+("REGULAR_SHOW"),
 ("SPEEDY_MCQUEEN"),
+("SPINNING"),
+("SPONGBOB"),
+("STRANGER_OMORI"),
 ("THE_ONE_PIECE_IS_REAL"),
 ("THREAT"),
 ("TOUHOU"),
+("WHITECAT"),
 ("WONDER")
 ;
-*/
 
 INSERT INTO sp_file_extensions_tbl (extension) VALUES
 ("png"),
+("webm"),
 ("jpg"),
 ("jpeg"),
 ("mp4"),

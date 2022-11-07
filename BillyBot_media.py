@@ -327,6 +327,9 @@ class Media:
     def get_filename(self):
         return f"{self._info['id']}.{self._info['ext']}"
 
+    def get_file_extension(self):
+        return f"{self._info['ext']}"
+
     def is_streamable(self):
         return self._route_type in (Media.GENERIC_AUDIO, Media.GENERIC_VIDEO)
 
