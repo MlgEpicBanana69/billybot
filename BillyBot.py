@@ -683,7 +683,6 @@ async def sp_delete_tag(ctx, tag:str):
 @BillyBot.slash_command(name="sp_pull_by_id")
 async def sp_pull_by_id(ctx, id:int, show_details:bool=False):
     """Pulls a shitpost by its ID"""
-    await ctx.defer()
     insufficient_privileges = sp_has_permission(str(ctx.author.id), query=False) # Check if user cannot query
     if insufficient_privileges[0] or not insufficient_privileges[1]:
         await ctx.respond("Insufficient privileges")
@@ -716,10 +715,9 @@ async def sp_pull_by_id(ctx, id:int, show_details:bool=False):
 @BillyBot.slash_command(name="sp_pull")
 async def sp_pull(ctx, tags:str=None, keyphrase:str=None):
     """Pulls a shitpost based on matching tags or description."""
-    await ctx.defer()
-    if tags is None and keyphrase is None:
-        await ctx.respond("Invalid arguments.")
-        return
+    #if tags is None and keyphrase is None:
+    #    await ctx.respond("Invalid arguments.")
+    #    return
 
     sql_cursor.execute("SELECT id, description FROM shitposts_tbl;")
     shitpost_descriptions = dict(list(sql_cursor))
@@ -734,7 +732,7 @@ async def sp_pull(ctx, tags:str=None, keyphrase:str=None):
             await ctx.respond("Could not find shitpost with given tags and keyphrase")
             return
         elif len(keyword_filter) == 0:
-            with open("resources/staticconjuctions.txt", "r") as conjuction_file:
+            with open("resources/static/conjuctions.txt", "r") as conjuction_file:
                 conjuction_words = conjuction_file.read().split('\n')
             for sp_id, sp_desc in shitpost_descriptions.items():
                 for part in keyphrase.split(' '):
@@ -748,22 +746,22 @@ async def sp_pull(ctx, tags:str=None, keyphrase:str=None):
                 return
 
     output = set()
+    sql_cursor.execute("SELECT tag, sp_shitposts_tags_tbl.shitpost_id FROM sp_tags_tbl INNER JOIN sp_shitposts_tags_tbl ON id = tag_id")
+    shitposts_tags = dict(list(sql_cursor))
     if tags is not None:
         tags = tags.upper()
         tag_list = tags.split(' ')
         for tag in tag_list:
-            for c in tag:
-                if not c.isalpha() and c != '_':
-                    await ctx.respond("One or more tags contain illegal characters")
+            if not sp_valid_tag(tag):
+                await ctx.respond("One or more tags contain illegal characters")
+                return
 
-        sql_cursor.execute("SELECT tag, shitposting_tags_tbl.shitpost_id FROM tags_tbl INNER JOIN shitposting_tags_tbl ON id = tag_id")
-        shitposts_tags = dict(list(sql_cursor))
         tagged_shitposts = {}
         max_tagged = 0
         for sp_tag, sp_id in shitposts_tags.items():
             if sp_tag in tags:
                 if sp_id not in tagged_shitposts.keys():
-                    tagged_shitposts[sp_id] = 0
+                    tagged_shitposts[sp_id] = 1
                 else:
                     tagged_shitposts[sp_id] += 1
                 if tagged_shitposts[sp_id] > max_tagged:
@@ -772,14 +770,19 @@ async def sp_pull(ctx, tags:str=None, keyphrase:str=None):
         if sum(tagged_shitposts.values()) == 0:
             await ctx.respond("Could not find shitpost with given tags and keyphrase")
             return
-        for sp_id in keyword_filter.keys():
-            if sp_id in tagged_shitposts:
-                if tagged_shitposts[sp_id] == max_tagged:
-                    output.add(sp_id)
+        for sp_id in set(tagged_shitposts.keys()).union(set(keyword_filter.keys())):
+            if tagged_shitposts[sp_id] == max_tagged:
+                output.add(sp_id)
     else:
         output = set(keyword_filter.keys())
 
-    await ctx.respond(f"{output}")
+    if tags is None and keyphrase is None:
+        output = set(shitposts_tags.values())
+
+    if len(output) > 1:
+        await ctx.respond("\n".join([f"id {sp_id}: {sp_desc}" for sp_id, sp_desc in shitpost_descriptions.items() if sp_id in output]))
+    elif len(output) == 1:
+        await sp_pull_by_id(ctx, output.pop())
 
 @BillyBot.slash_command(name="sp_delete_shitpost")
 async def sp_delete_shitpost(ctx, id:int):
@@ -866,7 +869,7 @@ async def shitpost(ctx, src:str, tags:str, description:str):
 #region intimidation responses
 def cyber_intimidation(message, keyphrase):
     insults = None
-    with open("resources/staticbilly_insults.txt", mode="r", encoding='utf-8') as f:
+    with open("resources/static/billy_insults.txt", mode="r", encoding='utf-8') as f:
         insults = f.read().split('\n')
     for insult in insults:
         if insult in keyphrase:
