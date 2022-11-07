@@ -224,16 +224,17 @@ async def aranara(ctx):
         await ctx.respond(file=discord.File(fp=aranara_pick, filename=aranara_choice_name))
 
 @BillyBot.slash_command(name="fetch_file")
-async def fetch_file(ctx, src:str, speed:float=1.0, force_audio_only:bool=False):
+async def fetch_file(ctx, src:str, force_audio_only:bool=False):
     await ctx.defer()
-    media = bb_media.Media(src,
-    speed=speed, force_audio_only=force_audio_only)
+    media = bb_media.Media(src, force_audio_only=force_audio_only)
     try:
         media.fetch_file(BOT_DISCORD_FILE_LIMIT)
-        await ctx.respond(content=media.get_name())
-        await ctx.respond("", file=discord.File(fp=io.BytesIO(media.get_content()), filename=f"{media.get_filename()}"))
+        if media.get_content():
+            await ctx.respond(media.get_name(), file=discord.File(fp=io.BytesIO(media.get_content()), filename=f"{media.get_filename()}"))
+        else:
+            await ctx.respond("File size exceeds allowed size")
     except:
-        raise
+        await ctx.respond("Error fetching file...")
 #endregion
 
 #region Chat toggles

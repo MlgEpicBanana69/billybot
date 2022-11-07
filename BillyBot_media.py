@@ -157,33 +157,44 @@ class Media:
             output_data = download_source(ultimate_sources['audio'][0])
         else:
             # DO SOME PROCCESSING
-            audio_contents = download_source(ultimate_sources['audio'][0])
-            video_contents = download_source(ultimate_sources['video'][-1])
+            audio_contents = False
+            video_contents = False
+            if len(ultimate_sources['audio']) > 0:
+                audio_contents = download_source(ultimate_sources['audio'][0])
+            if len(ultimate_sources['video']) > 0:
+                video_contents = download_source(ultimate_sources['video'][0])
 
-            try:
-                Media.TEMPFILE_LOCK.acquire()
-                audio_tempfile_fd, audio_tempfile_name   = tempfile.mkstemp(suffix=".m4a")
-                video_tempfile_fd, video_tempfile_name   = tempfile.mkstemp(suffix=".mp4")
-                merged_tempfile_fd, merged_tempfile_name = tempfile.mkstemp(suffix=".mp4")
+            if audio_contents and video_contents:
+                try:
+                    Media.TEMPFILE_LOCK.acquire()
+                    audio_tempfile_fd, audio_tempfile_name   = tempfile.mkstemp()
+                    video_tempfile_fd, video_tempfile_name   = tempfile.mkstemp()
+                    merged_tempfile_fd, merged_tempfile_name = tempfile.mkstemp(suffix=".mp4")
 
-                os.write(audio_tempfile_fd, audio_contents)
-                os.write(video_tempfile_fd, video_contents)
+                    os.write(audio_tempfile_fd, audio_contents)
+                    os.write(video_tempfile_fd, video_contents)
 
-                input_audio = ffmpeg.input(audio_tempfile_name)
-                input_video = ffmpeg.input(video_tempfile_name)
+                    input_audio = ffmpeg.input(audio_tempfile_name)
+                    input_video = ffmpeg.input(video_tempfile_name)
 
-                ffmpeg.concat(input_video, input_audio, v=1, a=1).output(merged_tempfile_name, loglevel="quiet").run(overwrite_output=True, )
+                    ffmpeg.concat(input_video, input_audio, v=1, a=1).output(merged_tempfile_name, loglevel="quiet").run(overwrite_output=True, )
 
-                with open(merged_tempfile_name, "rb") as tfile:
-                    output_data = tfile.read()
-            finally:
-                os.close(audio_tempfile_fd)
-                os.close(video_tempfile_fd)
-                os.close(merged_tempfile_fd)
-                os.remove(audio_tempfile_name)
-                os.remove(video_tempfile_name)
-                os.remove(merged_tempfile_name)
-                Media.TEMPFILE_LOCK.release()
+                    with open(merged_tempfile_name, "rb") as tfile:
+                        output_data = tfile.read()
+                finally:
+                    os.close(audio_tempfile_fd)
+                    os.close(video_tempfile_fd)
+                    os.close(merged_tempfile_fd)
+                    os.remove(audio_tempfile_name)
+                    os.remove(video_tempfile_name)
+                    os.remove(merged_tempfile_name)
+                    Media.TEMPFILE_LOCK.release()
+            elif video_contents:
+                output_data = video_contents
+            else:
+                self._content = None
+                return False
+
         self._content = output_data
         return True
 
@@ -221,14 +232,14 @@ class Media:
         #            'noplaylist':'True',
         #            'youtube_include_dash_manifest': False}
 
-        def filter_formats() -> str:
+        def filter_formats() -> dict:
             details = {'quality': -1, 'format_note': "", 'filesize': None}
             for fr in self._info['formats']:
                 for detail in details:
                     if detail not in fr:
                         fr[detail] = details[detail]
                 if 'fragment_base_url' in fr:
-                    if fr['url'] != fr['fragment_base_url']:
+                    if fr['url'].startswith("https://manifest.googlevideo.com/api/manifest/"):
                         fr['url'] = fr['fragment_base_url']
 
             arr = self._info['formats']
@@ -249,21 +260,19 @@ class Media:
                         else:
                             assert x['vcodec'] == 'none'
 
+                    assert '.m3u8' not in x['url']
+
                     return True
                 except AssertionError:
                     return False
 
             # info['formats'][-1]['url']
-            audio_suggestion = [x['url'] for x in arr if format_condition(x, ('mp4', 'm4a'), is_video=False)]
+            audio_suggestion = [x['url'] for x in arr if format_condition(x, ('mp4', 'm4a', 'webm'), is_video=False)][::-1]
             if not no_video:
-                video_suggestion = [x['url'] for x in arr if format_condition(x, ('mp4', 'm3u8'), is_video=True)]
+                video_suggestion = [x['url'] for x in arr if format_condition(x, ('mp4', 'm3u8', 'webm'), is_video=True)][::-1]
             else:
                 video_suggestion = []
                 # video_suggestions = [x['url'] for x in arr if format_condition(x, ("mp4",))]
-            if len(video_suggestion) == 0:
-                video_suggestion = None
-            if len(audio_suggestion) == 0:
-                audio_suggestion = None
             return {'video': video_suggestion, 'audio': audio_suggestion}
 
         format_change_required = (no_video and self._route_type == Media.GENERIC_VIDEO) or (not no_video and self._route_type == Media.GENERIC_AUDIO)
@@ -281,7 +290,10 @@ class Media:
             urls = filter_formats()
             ultimate_sources = urls
         else:
-            ultimate_sources = (self._source,)
+            if no_video:
+                return {'video': [], 'audio': [self._source,]}
+            else:
+                return {'video': [self._source,], 'audio': []}
         return ultimate_sources
 
     def get_name(self):
