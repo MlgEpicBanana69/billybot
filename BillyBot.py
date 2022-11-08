@@ -4,7 +4,6 @@ import random
 
 import discord
 from discord.ext import commands
-from discord.utils import get
 import asyncio
 from dotenv import load_dotenv
 import cv2
@@ -12,7 +11,6 @@ import numpy as np
 import validators
 import hashlib
 import mysql.connector
-from concurrent.futures import ThreadPoolExecutor
 
 import BillyBot_utils as bb_utils
 import BillyBot_games as bb_games
