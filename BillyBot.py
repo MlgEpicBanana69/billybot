@@ -784,7 +784,12 @@ async def sp_pull(ctx, tags:str=None, keyphrase:str=None):
         output = set(shitposts_tags.values())
 
     if len(output) > 1:
-        await ctx.respond("\n".join([f"id {sp_id}: {sp_desc}" for sp_id, sp_desc in shitpost_descriptions.items() if sp_id in output]))
+        output_message = []
+        for sp_id, sp_desc in shitpost_descriptions.items():
+            if sp_id in output:
+                output_message.append((sp_id, f"id {sp_id}: {sp_desc}"))
+        output_message = sorted(output_message, key=lambda x: x[0])
+        await ctx.respond("\n".join([part for _, part in output_message]))
     elif len(output) == 1:
         await sp_pull_by_id(ctx, output.pop())
 
