@@ -275,7 +275,7 @@ async def purge(ctx, n:int=None, before:str=None):
 
 #region Player commands
 @BillyBot.slash_command(name="play")
-async def play(ctx, source:str, speed:float=1.0):
+async def play(ctx, source:str=None, shitpost_id:int=None, speed:float=1.0):
     """Plays audio from an audio source
 
     # Playing a 'source' goes by these rules:
@@ -288,25 +288,24 @@ async def play(ctx, source:str, speed:float=1.0):
         guild_player = bb_media.Player.get_player(ctx.guild)
         ultimate_source = None
 
+        if source is not None:
+            # Source is message content
+            if validators.url(source):
+                ultimate_source = source
+            # Source is youtube query
+            else:
+                results = bb_media.Media.query_youtube(source)
+                await ctx.channel.send("\n".join([entry[1] for entry in results]))
 
-        # Source is attachment
-        # if len(ctx.message.attachments) > 0:
-        #    attachment = ctx.message.attachments[0]
-        #    media = bb_media.Media(attachment.url)
-        #    await guild_player.play(media)
+                # TODO: Reactive video choosing
+                chosen_result = results[0]
 
-        # Source is message content
-        if validators.url(source):
-            ultimate_source = source
-        # Source is youtube query
+                ultimate_source = chosen_result[0]
+        elif shitpost_id is not None:
+            ultimate_source = f"shitpost{shitpost_id}"
         else:
-            results = bb_media.Media.query_youtube(source)
-            await ctx.channel.send("\n".join([entry[1] for entry in results]))
-
-            # TODO: Reactive video choosing
-            chosen_result = results[0]
-
-            ultimate_source = chosen_result[0]
+            await ctx.respond("Invalid parameters to play.")
+            return
 
         media = bb_media.Media(ultimate_source, force_audio_only=True, speed=speed)
         await guild_player.play(media)
@@ -722,28 +721,35 @@ async def sp_pull(ctx, tags:str=None, keyphrase:str=None):
     sql_cursor.execute("SELECT id, description FROM shitposts_tbl;")
     shitpost_descriptions = dict(list(sql_cursor))
 
+    def format_description(desc):
+        output = ""
+        for c in desc.lower():
+            if c.isdigit() or c.isalpha() or c == ' ':
+                output += c
+            elif c == '_':
+                output += " "
+        return output
+
     keyword_filter = {}
     if keyphrase is not None:
         keyphrase = keyphrase.lower()
         for sp_id, sp_desc in shitpost_descriptions.items():
-            if keyphrase in sp_desc:
+            if keyphrase in sp_desc.lower():
                 keyword_filter[sp_id] = len(keyphrase)
-        if len(keyword_filter) == 0 and len(keyphrase.split(' ')) == 1:
-            await ctx.respond("Could not find shitpost with given tags and keyphrase")
-            return
-        elif len(keyword_filter) == 0:
+        if len(keyword_filter) == 0:
             with open("resources/static/conjuctions.txt", "r") as conjuction_file:
                 conjuction_words = conjuction_file.read().split('\n')
             for sp_id, sp_desc in shitpost_descriptions.items():
                 for part in keyphrase.split(' '):
-                    if part in sp_desc and part not in conjuction_words:
+                    part = format_description(part)
+                    if part in format_description(sp_desc) and part not in conjuction_words and part != '':
                         if sp_id not in keyword_filter:
                             keyword_filter[sp_id] = len(part)
                         else:
                             keyword_filter[sp_id] += len(part)
-            if len(keyword_filter) == 0:
-                await ctx.respond("Could not find shitpost with given tags and keyphrase")
-                return
+        if len(keyword_filter) == 0:
+            await ctx.respond("Could not find shitpost with given tags and keyphrase")
+            return
 
     output = set()
     sql_cursor.execute("SELECT tag, sp_shitposts_tags_tbl.shitpost_id FROM sp_tags_tbl INNER JOIN sp_shitposts_tags_tbl ON id = tag_id")
@@ -792,6 +798,14 @@ async def sp_delete_shitpost(ctx, id:int):
         return
 
     sql_cursor.execute("DELETE FROM shitposts_tbl WHERE id=%s", (id,))
+
+    for filename in os.listdir("resources\\dynamic\\shitposts\\"):
+        if filename.startswith(f"shitpost{id}"):
+            os.remove(f"resources\\dynamic\\shitposts\\{filename}")
+            break
+    else:
+        raise AssertionError
+
     sql_connection.commit()
     await ctx.respond(f"Deleted shitpost {id}")
 

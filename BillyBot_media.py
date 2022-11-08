@@ -9,6 +9,7 @@ import discord
 from discord.utils import get
 import ffmpeg
 import os
+import io
 import tempfile
 import threading
 
@@ -36,6 +37,7 @@ class Media:
         self._stream = None
         self._info = {}
         self._extension = None
+        self._local = None
 
         self.force_audio_only = force_audio_only
         self.speed = speed
@@ -98,6 +100,7 @@ class Media:
         name = None
         info = {}
         force_raw_source = False
+        local = None
         if validators.url(self._source):
             is_media = self.is_web_media()
             if is_media:
@@ -128,74 +131,94 @@ class Media:
                     extension = mimestart.split('/')[1]
             elif len(urlparse(self._source).path.split('/')[-1].split('.')) == 2:
                 route = Media.GENERIC_FILE
+        elif self._source.startswith("shitpost"):
+            _, shitpost_id = self._source.split("shitpost")
+            shitpost_id = int(shitpost_id)
+
+            for filename in os.listdir("resources/dynamic/shitposts/"):
+                if filename.startswith(f"shitpost{shitpost_id}"):
+                    name = f"shitpost{shitpost_id}"
+                    info = {"id": name, "ext": filename.split('.')[-1]}
+                    extension = info["ext"]
+
+                    mimestart = mimetypes.guess_type(filename)[0]
+                    route = "generic_" + mimestart.split('/')[0]
+                    local = f"resources/dynamic/shitposts/{filename}"
+                    break
+
         self._route_type = route
         self._name = name
         self._extension = extension
         self._info = info
+        self._local = local
 
     def fetch_file(self, size_limit:int=104857600):
-        # 100MB
-        no_video = self.force_audio_only
-        ultimate_sources = self.get_ultimate_sources(no_video=no_video, sizelimit=size_limit)
-        def download_source(source:str):
-            resp = requests.get(source, stream=True)
-            resp.raise_for_status()
-            contents = bytes()
-            # 4MB (4194304)
-            curr_size = 0
-            for chunk in resp.iter_content(65536):
-                curr_size += len(chunk)
-                if curr_size > size_limit:
-                    resp.close()
-                    return None
-                contents += chunk
-            return contents
+        if self._local is None:
+            # 100MB
+            no_video = self.force_audio_only
+            ultimate_sources = self.get_ultimate_sources(no_video=no_video, sizelimit=size_limit)
+            def download_source(source:str):
+                resp = requests.get(source, stream=True)
+                resp.raise_for_status()
+                contents = bytes()
+                # 4MB (4194304)
+                curr_size = 0
+                for chunk in resp.iter_content(65536):
+                    curr_size += len(chunk)
+                    if curr_size > size_limit:
+                        resp.close()
+                        return None
+                    contents += chunk
+                return contents
 
-        # TODO: add error handling in case fetching file fails
-        # TODO: Change ultimate sources interaction
-        if no_video:
-            output_data = download_source(ultimate_sources['audio'][0])
-        else:
-            # DO SOME PROCCESSING
-            audio_contents = False
-            video_contents = False
-            if len(ultimate_sources['audio']) > 0:
-                audio_contents = download_source(ultimate_sources['audio'][0])
-            if len(ultimate_sources['video']) > 0:
-                video_contents = download_source(ultimate_sources['video'][0])
-
-            if audio_contents and video_contents:
-                try:
-                    Media.TEMPFILE_LOCK.acquire()
-                    audio_tempfile_fd, audio_tempfile_name   = tempfile.mkstemp()
-                    video_tempfile_fd, video_tempfile_name   = tempfile.mkstemp()
-                    merged_tempfile_fd, merged_tempfile_name = tempfile.mkstemp(suffix=".mp4")
-
-                    os.write(audio_tempfile_fd, audio_contents)
-                    os.write(video_tempfile_fd, video_contents)
-
-                    input_audio = ffmpeg.input(audio_tempfile_name)
-                    input_video = ffmpeg.input(video_tempfile_name)
-
-                    ffmpeg.concat(input_video, input_audio, v=1, a=1).output(merged_tempfile_name, loglevel="quiet").run(overwrite_output=True, )
-
-                    with open(merged_tempfile_name, "rb") as tfile:
-                        output_data = tfile.read()
-                finally:
-                    os.close(audio_tempfile_fd)
-                    os.close(video_tempfile_fd)
-                    os.close(merged_tempfile_fd)
-                    os.remove(audio_tempfile_name)
-                    os.remove(video_tempfile_name)
-                    os.remove(merged_tempfile_name)
-                    Media.TEMPFILE_LOCK.release()
-            elif video_contents:
-                output_data = video_contents
+            # TODO: add error handling in case fetching file fails
+            # TODO: Change ultimate sources interaction
+            if no_video:
+                output_data = download_source(ultimate_sources['audio'][0])
             else:
-                self._content = None
-                return False
+                # DO SOME PROCCESSING
+                audio_contents = False
+                video_contents = False
+                if len(ultimate_sources['audio']) > 0:
+                    audio_contents = download_source(ultimate_sources['audio'][0])
+                if len(ultimate_sources['video']) > 0:
+                    video_contents = download_source(ultimate_sources['video'][0])
 
-        self._content = output_data
+                if audio_contents and video_contents:
+                    try:
+                        Media.TEMPFILE_LOCK.acquire()
+                        audio_tempfile_fd, audio_tempfile_name   = tempfile.mkstemp()
+                        video_tempfile_fd, video_tempfile_name   = tempfile.mkstemp()
+                        merged_tempfile_fd, merged_tempfile_name = tempfile.mkstemp(suffix=".mp4")
+
+                        os.write(audio_tempfile_fd, audio_contents)
+                        os.write(video_tempfile_fd, video_contents)
+
+                        input_audio = ffmpeg.input(audio_tempfile_name)
+                        input_video = ffmpeg.input(video_tempfile_name)
+
+                        ffmpeg.concat(input_video, input_audio, v=1, a=1).output(merged_tempfile_name, loglevel="quiet").run(overwrite_output=True, )
+
+                        with open(merged_tempfile_name, "rb") as tfile:
+                            output_data = tfile.read()
+                    finally:
+                        os.close(audio_tempfile_fd)
+                        os.close(video_tempfile_fd)
+                        os.close(merged_tempfile_fd)
+                        os.remove(audio_tempfile_name)
+                        os.remove(video_tempfile_name)
+                        os.remove(merged_tempfile_name)
+                        Media.TEMPFILE_LOCK.release()
+                elif video_contents:
+                    output_data = video_contents
+                else:
+                    self._content = None
+                    return False
+
+            self._content = output_data
+        else:
+            with open(self._local, "rb") as local_file:
+                self._content = local_file.read()
         return True
 
     def generate_stream(self) -> bool:
@@ -206,15 +229,22 @@ class Media:
         assert self.is_streamable()
 
         no_video = True
-        ffmpeg_options = Media.STREAM_FFMPEG_OPTIONS.copy()
+        if self._local is None:
+            ffmpeg_options = Media.STREAM_FFMPEG_OPTIONS.copy()
+        else:
+            ffmpeg_options = {'options': ""}
         if self.speed != 1.0:
             ffmpeg_options['options'] += f' -filter:a "atempo={self.speed}" '
         if no_video:
             ffmpeg_options['options'] += ' -vn '
 
-        ultimate_sources = self.get_ultimate_sources(no_video=no_video)
-        if ultimate_sources['audio'] is not None:
-            self._stream = discord.FFmpegPCMAudio(ultimate_sources['audio'][0], **ffmpeg_options)
+        if self._local is None:
+            ultimate_sources = self.get_ultimate_sources(no_video=no_video)
+            if ultimate_sources['audio'] is not None:
+                self._stream = discord.FFmpegPCMAudio(ultimate_sources['audio'][0], **ffmpeg_options)
+                return True
+        else:
+            self._stream = discord.FFmpegPCMAudio(os.path.join(os.path.curdir, self._local), **ffmpeg_options)
             return True
         return False
 
