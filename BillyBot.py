@@ -11,6 +11,8 @@ import numpy as np
 import validators
 import hashlib
 import mysql.connector
+import requests
+from bs4 import BeautifulSoup
 
 import BillyBot_utils as bb_utils
 import BillyBot_games as bb_games
@@ -232,6 +234,15 @@ async def fetch_file(ctx, src:str, force_audio_only:bool=False):
             await ctx.respond("File size exceeds allowed size")
     except:
         await ctx.respond("Error fetching file...")
+
+@BillyBot.slash_command(name="weekly_torah_portion")
+async def weekly_torah_portion(ctx):
+    resp = requests.get("https://www.פרשת-שבוע.com")
+    soup = BeautifulSoup(resp.text, 'html.parser')
+    href = resp.text.split("post-title entry-title")[1].split("href=")[1].split(">")[0][1:-1:]
+    output = resp.text.split("post-title entry-title")[1].split(">")[2][:-3:]
+    embed = discord.Embed(title=output, url=href)
+    await ctx.respond(embed=embed)
 #endregion
 
 #region Chat toggles
@@ -624,6 +635,10 @@ async def sp_modify_user(ctx, discord_user:str, privilege_name:str):
         sql_cursor.execute("UPDATE sp_users_tbl SET privilege_id=%s WHERE discord_user_id=%s", (privilege_dict[privilege_name], target_user))
     sql_connection.commit()
     await ctx.respond("Completed action")
+
+@BillyBot.slash_command(name="sp_rate_shitpost")
+async def sp_rate_shitpost(ctx, shitpost_id:int, rating:int):
+    pass
 
 @BillyBot.slash_command(name="sp_list_tags")
 async def sp_list_tags(ctx, contains:str="", startswith:str=""):
