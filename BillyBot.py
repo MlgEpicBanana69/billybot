@@ -647,7 +647,7 @@ async def sp_rate_shitpost(ctx, shitpost_id:int, rating:int):
         else:
             raise
     sql_connection.commit()
-    reply = f"Shitpost {shitpost_id} was given a rating of {rating} points!\nShitpost {shitpost_id} is now rated as {sp_rating_avg(shitpost_id)}"
+    reply = f"Shitpost {shitpost_id} was given a rating of {rating} points!\nShitpost {shitpost_id} is now rated at {sp_rating_avg(shitpost_id)}"
     await ctx.respond(reply)
 
 
