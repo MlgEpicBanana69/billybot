@@ -37,7 +37,7 @@ CREATE TABLE `shitposts_tbl` (
   KEY `FK_submitterID_shitposts` (`submitter_id`),
   CONSTRAINT `FK_fileExtensionID_shitposts` FOREIGN KEY (`file_extension_id`) REFERENCES `sp_file_extensions_tbl` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT `FK_submitterID_shitposts` FOREIGN KEY (`submitter_id`) REFERENCES `sp_users_tbl` (`discord_user_id`) ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=31 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -46,7 +46,7 @@ CREATE TABLE `shitposts_tbl` (
 
 LOCK TABLES `shitposts_tbl` WRITE;
 /*!40000 ALTER TABLE `shitposts_tbl` DISABLE KEYS */;
-INSERT INTO `shitposts_tbl` VALUES (6,'65be12bedafb89af39613123bb1278f029cabeebe7b787d365810dda9a0626eb',5,'238834017980514304','whitecat is not the father and does not need to pay child support whitedoable'),(7,'bd8768f061f5919973b249654b6f3656ee36141c2da3ceae70123ada19728be8',5,'238834017980514304','horizontally spinning stranger'),(8,'f52892b66218a5069d87e13bd26e0c9e72c322a857fb6ed3fbb84a928193641c',2,'238834017980514304','Let\'s Say, Hypothetically, I\'m a Barbie Girl'),(9,'042db74536f66ade492576f591740010bb64a1ee99a2ea9853b80162a36790fd',5,'238834017980514304','Cat saved from death by employees'),(10,'abca094b990c1ff761c8cb6ffe2f1dfd65d6828b52d13859896eba4eaf07c138',5,'238834017980514304','glorious stage housing an avocado');
+INSERT INTO `shitposts_tbl` VALUES (6,'65be12bedafb89af39613123bb1278f029cabeebe7b787d365810dda9a0626eb',5,'238834017980514304','whitecat is not the father and does not need to pay child support whitedoable'),(7,'bd8768f061f5919973b249654b6f3656ee36141c2da3ceae70123ada19728be8',5,'238834017980514304','horizontally spinning stranger'),(8,'f52892b66218a5069d87e13bd26e0c9e72c322a857fb6ed3fbb84a928193641c',2,'238834017980514304','Let\'s Say, Hypothetically, I\'m a Barbie Girl'),(9,'042db74536f66ade492576f591740010bb64a1ee99a2ea9853b80162a36790fd',5,'238834017980514304','Cat saved from death by employees'),(10,'abca094b990c1ff761c8cb6ffe2f1dfd65d6828b52d13859896eba4eaf07c138',5,'238834017980514304','glorious stage housing an avocado'),(11,'cc18bc7b6be153e48bb06c050a28b1e830dae58f0cab5b6976940f253feebf82',5,'238834017980514304','mad funny slap walk nigga getting hard slapped from behind'),(12,'544eaefc42687d9e597503431610672a60de608d49b2879ff48b46d790aeef9d',5,'238834017980514304','two cats spinnng a frying pan'),(13,'18ce19daef9236ca1213463676fa9ec0b14a5adf89a2396f9485ed7611600e30',5,'238834017980514304','no nut november is for beta ass mfs speech'),(14,'83b3b6c32ae07a5cfcb6fc22c17454888c5f7fea4d6b1e353406858244de5448',5,'238834017980514304','rocket league arial into twerking'),(16,'2131175b9860abc8fd60a5971e3cc5e45a2fdd17244ff7882dd39b67e3801479',5,'238834017980514304','cyberpunk edgerunners and the lego movie are identical'),(17,'ee953b33032efa5c4d90894a773ed6bc284bc1578a6bad3a7f0998c115612a06',5,'238834017980514304','mari doxes your ip'),(18,'976508d5a1c548253f757cba3e3585977648658abc403263966180602d747a3b',5,'238834017980514304','trollface cookies'),(19,'a99d5899df1547079cbffdf86a0d100339ab5ca96cab3dfdf83198a0547cc142',5,'238834017980514304','Zalenski requests 4 billion rockets to bomb donesk children'),(20,'1fe7358cc86bf6520c8ec8bff87b5f6cea4af17d4b874a192d9103f874b61283',5,'238834017980514304','nahida zhongli model swap'),(21,'223c7f333766d8b42f2b4e3280a4a90da5a49687252a4836a553b38f3df95552',5,'238834017980514304','Humans when a person is one year closer to death'),(22,'b394baca085a01eabf1fc7dc460b42862f303b98e48ebbfa31f4844a8fdd2c0e',3,'238834017980514304','art of basil as baller'),(23,'0d4a140d61943a7f9e72896c5b80ea96adc3c9f18f68b2d09b064adc0345ef96',5,'238834017980514304','gay king of the hill'),(24,'a21c9bd0cf1d14e1814624082fbe2f759fd4abc70fc9385f3adc2d66e93ed9ec',3,'238834017980514304','this old condom I found under my bed looks like the Mockingjay pin'),(25,'84f85e1e4bdbd7997e71655e4ee43b89ec520ae3c9517e259d5fa697e0f12b9e',5,'238834017980514304','the scenery sure is pleasent from my hot squid balloon'),(27,'9081d4b6d1fd3fbfc848926fde5f6a7bf1550e2dfd3bc0ae03aaf2343867725b',5,'238834017980514304','terraria developers the one piece is real'),(28,'5e4170875d8b3063380392b47473cfddea43d0eff111b1e54f31938b28548df7',5,'238834017980514304','teacher teaching how to prenounce moans'),(29,'e0cf4dada9c54ce8fb18c1c4a2f21ffd11b1b9dfb59039362860dccc13826788',5,'238834017980514304','pidgeon dancing on a table with a group of people'),(30,'4b3a0e71086a09d6eaccab2e3b33fac184a2241a235021c1c318b13758953474',7,'238834017980514304','Installing VLC Media Player');
 /*!40000 ALTER TABLE `shitposts_tbl` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -93,7 +93,7 @@ CREATE TABLE `sp_rating_tbl` (
   CONSTRAINT `FK_shitpostID_rating` FOREIGN KEY (`shitpost_id`) REFERENCES `shitposts_tbl` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `FK_submitterID_rating` FOREIGN KEY (`submitter_id`) REFERENCES `sp_users_tbl` (`discord_user_id`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `legal_rating` CHECK (((`rating` >= 0) or (`rating` <= 100)))
-) ENGINE=InnoDB AUTO_INCREMENT=26 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=27 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -102,7 +102,7 @@ CREATE TABLE `sp_rating_tbl` (
 
 LOCK TABLES `sp_rating_tbl` WRITE;
 /*!40000 ALTER TABLE `sp_rating_tbl` DISABLE KEYS */;
-INSERT INTO `sp_rating_tbl` VALUES (1,80,'238834017980514304',6),(22,90,'238834017980514304',7);
+INSERT INTO `sp_rating_tbl` VALUES (1,80,'238834017980514304',6),(22,90,'238834017980514304',7),(26,2,'238834017980514304',8);
 /*!40000 ALTER TABLE `sp_rating_tbl` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -122,7 +122,7 @@ CREATE TABLE `sp_shitposts_tags_tbl` (
   KEY `FK_shitpostID_shitpostingTags` (`shitpost_id`),
   CONSTRAINT `FK_shitpostID_shitpostingTags` FOREIGN KEY (`shitpost_id`) REFERENCES `shitposts_tbl` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `FK_tagID_shitpostingTags` FOREIGN KEY (`tag_id`) REFERENCES `sp_tags_tbl` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=25 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=70 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -131,7 +131,7 @@ CREATE TABLE `sp_shitposts_tags_tbl` (
 
 LOCK TABLES `sp_shitposts_tags_tbl` WRITE;
 /*!40000 ALTER TABLE `sp_shitposts_tags_tbl` DISABLE KEYS */;
-INSERT INTO `sp_shitposts_tags_tbl` VALUES (15,15,7),(14,17,6),(16,23,7),(13,27,6),(24,28,10),(17,30,8),(18,31,8),(21,32,9),(22,33,9),(20,34,9),(19,35,9),(23,36,10);
+INSERT INTO `sp_shitposts_tags_tbl` VALUES (15,15,7),(51,15,22),(14,17,6),(16,23,7),(63,24,27),(39,25,17),(13,27,6),(24,28,10),(67,28,29),(59,29,25),(17,30,8),(18,31,8),(21,32,9),(22,33,9),(68,33,30),(20,34,9),(28,34,12),(19,35,9),(23,36,10),(26,37,11),(56,37,24),(25,38,11),(27,39,12),(50,40,22),(30,41,13),(29,43,13),(31,44,14),(34,47,16),(35,49,16),(37,50,17),(38,51,17),(36,52,17),(40,53,18),(41,54,19),(42,55,19),(43,56,19),(46,63,20),(47,64,20),(45,65,20),(44,66,20),(48,68,21),(49,69,22),(52,70,22),(54,71,23),(53,72,23),(55,73,24),(58,75,25),(57,76,25),(62,77,27),(64,79,28),(66,81,29),(65,82,29),(69,83,30);
 /*!40000 ALTER TABLE `sp_shitposts_tags_tbl` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -147,7 +147,7 @@ CREATE TABLE `sp_tags_tbl` (
   `tag` varchar(256) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `tag_UNIQUE` (`tag`)
-) ENGINE=InnoDB AUTO_INCREMENT=37 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=84 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -156,7 +156,7 @@ CREATE TABLE `sp_tags_tbl` (
 
 LOCK TABLES `sp_tags_tbl` WRITE;
 /*!40000 ALTER TABLE `sp_tags_tbl` DISABLE KEYS */;
-INSERT INTO `sp_tags_tbl` VALUES (1,'8_BIT'),(2,'AMOGUS'),(3,'ARANARA'),(4,'BAD_APPLE'),(30,'BEN_SHAPIRO'),(5,'BETTER_CALL_SAUL'),(6,'BREAKING_BAD'),(7,'CARS_MOVIE'),(34,'CAT'),(8,'CBT'),(35,'CURSED'),(32,'DEATH'),(31,'FACTS_AND_LOGIC'),(9,'FUMO'),(10,'INTRODUCTION_MEME'),(11,'LEBRON_JAMES'),(12,'LOW_QUALITY'),(13,'MUSIC'),(14,'MY_CHILD_MEME'),(33,'NSFW'),(15,'OMORI'),(16,'ONE_PIECE'),(17,'OSUGAME'),(18,'PIRACY'),(19,'REGULAR_SHOW'),(36,'ROBOTICS'),(20,'SPEEDY_MCQUEEN'),(21,'SPINNING'),(29,'SPONGEBOB'),(23,'STRANGER_OMORI'),(24,'THE_ONE_PIECE_IS_REAL'),(25,'THREAT'),(26,'TOUHOU'),(27,'WHITECAT'),(28,'WONDER');
+INSERT INTO `sp_tags_tbl` VALUES (1,'8_BIT'),(64,'ALBEDOS_CREATIONS'),(2,'AMOGUS'),(81,'ANIMAL'),(3,'ARANARA'),(4,'BAD_APPLE'),(69,'BALLER_ROBLOX'),(70,'BASIL_OMORI'),(30,'BEN_SHAPIRO'),(5,'BETTER_CALL_SAUL'),(82,'BIRB'),(68,'BIRTHDAY_CELEBRATION'),(6,'BREAKING_BAD'),(37,'BRUH_MOMENT'),(7,'CARS_MOVIE'),(34,'CAT'),(8,'CBT'),(61,'CHINA'),(83,'COMPUTER_IT_MEME'),(35,'CURSED'),(46,'CYBERPUNK'),(47,'CYBERPUNK_EDGERUNNERS'),(32,'DEATH'),(51,'DOX'),(31,'FACTS_AND_LOGIC'),(60,'FRANCE'),(9,'FUMO'),(72,'GAY'),(63,'GENSHIN_IMPACT'),(39,'HALF_LIFE'),(73,'HUNGER_GAMES'),(10,'INTRODUCTION_MEME'),(50,'IP'),(57,'ISRAEL'),(71,'KING_OF_THE_HILL'),(78,'KIRIKO_OVERWATCH'),(11,'LEBRON_JAMES'),(12,'LOW_QUALITY'),(52,'MARI_OMORI'),(43,'MOTIVATIONAL'),(13,'MUSIC'),(14,'MY_CHILD_MEME'),(66,'NAHIDA_GENSHIN'),(38,'NIGGA'),(41,'NO_NUT_NOVEMBER'),(33,'NSFW'),(15,'OMORI'),(16,'ONE_PIECE'),(17,'OSUGAME'),(80,'OVERWATCH'),(58,'PALESTINE'),(18,'PIRACY'),(19,'REGULAR_SHOW'),(40,'ROBLOX'),(36,'ROBOTICS'),(44,'ROCKET_LEAGUE'),(56,'RUSSIA_UKRAINE_WAR'),(79,'SEX_THEORY'),(20,'SPEEDY_MCQUEEN'),(21,'SPINNING'),(29,'SPONGEBOB'),(76,'SPONGEBOB_SHOW'),(75,'SQUIDWARD'),(23,'STRANGER_OMORI'),(77,'TERRARIA'),(49,'THE_LEGO_MOVIE'),(24,'THE_ONE_PIECE_IS_REAL'),(25,'THREAT'),(26,'TOUHOU'),(53,'TROLLFACE'),(55,'UKRAINE'),(62,'UNITED_KINGDOM'),(59,'UNITED_STATES'),(27,'WHITECAT'),(28,'WONDER'),(54,'ZALENSKI'),(65,'ZHONGLI_GENSHIN');
 /*!40000 ALTER TABLE `sp_tags_tbl` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -279,4 +279,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2022-11-09  7:17:44
+-- Dump completed on 2022-11-09 12:57:05
