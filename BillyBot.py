@@ -420,7 +420,7 @@ async def cyber(ctx, args=""):
     """Overlays the text סייבר on a given image."""
 
     await ctx.defer()
-    message_sources = [arg for arg in args if validators.url(arg)]
+    message_sources = [arg for arg in args.split(' ') if validators.url(arg)]
     img_objects = []
     for i, source in enumerate(message_sources):
         image_obj = bb_media.Media(source)
