@@ -420,7 +420,7 @@ async def cyber(ctx, args=""):
     """Overlays the text סייבר on a given image."""
 
     await ctx.defer()
-    message_sources = _all_ctx_sources(ctx, args)
+    message_sources = [arg for arg in args if validators.url(arg)]
     img_objects = []
     for i, source in enumerate(message_sources):
         image_obj = bb_media.Media(source)
@@ -525,19 +525,6 @@ async def sus(ctx, user):
 async def love(ctx, user):
     """Tag someone you like"""
     await ctx.respond(f"{ctx.author.mention} ❤️ {user.mention} 🥰")
-# endregion
-
-#region Helper functions
-def _all_ctx_sources(ctx, args):
-    "Returns a of all file sources from given ctx + args"
-    output = []
-    # if ctx.message.attachments != []:
-    #    for attachment in ctx.message.attachments:
-    #         output.append(attachment.url)
-    for arg in args.split():
-        if validators.url(arg):
-            output.append(arg)
-    return output
 # endregion
 
 #region osu commands
