@@ -371,6 +371,9 @@ class Media:
         This function will silently perform the immediate proccessing.
         """
         if validators.url(self._source):
+            if self._source.startswith("https://www.youtube.com/shorts/"):
+                self._source = "https://www.youtube.com/watch?v=" + self._source.split("https://www.youtube.com/shorts/")[-1]
+
             if self._source.startswith("https://www.youtube.com/watch?v=") or self._source.startswith("https://youtu.be/"):
                 return True
             elif self._source.startswith("https://www.reddit.com/"):

@@ -593,6 +593,37 @@ def sp_rating_avg(shitpost_id:int) -> float:
     sql_cursor.execute("SELECT AVG(rating) as avg_rating from sp_rating_tbl where shitpost_id=%s group by shitpost_id", (shitpost_id,))
     return float(list(sql_cursor)[0][0])
 
+async def sp_pull_by_id(ctx, id:int, show_details:bool=False):
+    """Pulls a shitpost by its ID"""
+    insufficient_privileges = sp_has_permission(str(ctx.author.id), query=False) # Check if user cannot query
+    if insufficient_privileges[0] or not insufficient_privileges[1]:
+        await ctx.respond("Insufficient privileges")
+        return
+
+    assert type(id) == int
+    output_msg = ""
+    sql_cursor.execute("SELECT * FROM shitposts_tbl WHERE id=%s", (id,))
+    shitpost = [key for subl in list(sql_cursor) for key in subl]
+    if len(shitpost) == 0:
+        await ctx.respond("Shitpost with given ID not found.")
+        return
+    shitpost_file_hash = shitpost.pop(1)
+    shitpost_file_ext = shitpost.pop(1)
+    sql_cursor.execute("SELECT extension FROM sp_file_extensions_tbl WHERE id=%s", (shitpost_file_ext,))
+    shitpost_file_ext = list(sql_cursor)[0][0]
+
+    shitpost_file = open(f"resources/dynamic/shitposts/shitpost{id}.{shitpost_file_ext}", "rb")
+
+    if show_details:
+        shitpost = dict(zip(("id", "submitter", "description"), shitpost))
+        shitpost["submitter"] = await BillyBot.fetch_user(int(shitpost["submitter"]))
+        for key, value in shitpost.items():
+            output_msg += f"{key}: {value}\n"
+        output_msg += f"hash: {shitpost_file_hash}"
+
+    await ctx.respond(output_msg, file=discord.File(fp=shitpost_file, filename=f"shitpost{id}.{shitpost_file_ext}"))
+    shitpost_file.close()
+
 @BillyBot.slash_command(name="sp_modify_user")
 async def sp_modify_user(ctx, discord_user:str, privilege_name:str):
     """
@@ -627,8 +658,8 @@ async def sp_modify_user(ctx, discord_user:str, privilege_name:str):
     sql_connection.commit()
     await ctx.respond("Completed action")
 
-@BillyBot.slash_command(name="sp_rate_shitpost")
-async def sp_rate_shitpost(ctx, shitpost_id:int, rating:int):
+@BillyBot.slash_command(name="sp_rate")
+async def sp_rate(ctx, shitpost_id:int, rating:int):
     submitter_id = str(ctx.author.id)
     if not sp_has_permission(submitter_id, rate=True)[0]:
         await ctx.respond("Insufficient permissions.")
@@ -649,7 +680,6 @@ async def sp_rate_shitpost(ctx, shitpost_id:int, rating:int):
     sql_connection.commit()
     reply = f"Shitpost {shitpost_id} was given a rating of {rating} points!\nShitpost {shitpost_id} is now rated at {sp_rating_avg(shitpost_id)}"
     await ctx.respond(reply)
-
 
 @BillyBot.slash_command(name="sp_list_tags")
 async def sp_list_tags(ctx, contains:str="", startswith:str=""):
@@ -703,121 +733,89 @@ async def sp_delete_tag(ctx, tag:str):
     sql_connection.commit()
     await ctx.respond(f"Deleted tag *{tag}*")
 
-@BillyBot.slash_command(name="sp_pull_by_id")
-async def sp_pull_by_id(ctx, id:int, show_details:bool=False):
-    """Pulls a shitpost by its ID"""
-    insufficient_privileges = sp_has_permission(str(ctx.author.id), query=False) # Check if user cannot query
-    if insufficient_privileges[0] or not insufficient_privileges[1]:
-        await ctx.respond("Insufficient privileges")
-        return
-
-    assert type(id) == int
-    output_msg = ""
-    sql_cursor.execute("SELECT * FROM shitposts_tbl WHERE id=%s", (id,))
-    shitpost = [key for subl in list(sql_cursor) for key in subl]
-    if len(shitpost) == 0:
-        await ctx.respond("Shitpost with given ID not found.")
-        return
-    shitpost_file_hash = shitpost.pop(1)
-    shitpost_file_ext = shitpost.pop(1)
-    sql_cursor.execute("SELECT extension FROM sp_file_extensions_tbl WHERE id=%s", (shitpost_file_ext,))
-    shitpost_file_ext = list(sql_cursor)[0][0]
-
-    shitpost_file = open(f"resources/dynamic/shitposts/shitpost{id}.{shitpost_file_ext}", "rb")
-
-    if show_details:
-        shitpost = dict(zip(("id", "submitter", "description"), shitpost))
-        shitpost["submitter"] = await BillyBot.fetch_user(int(shitpost["submitter"]))
-        for key, value in shitpost.items():
-            output_msg += f"{key}: {value}\n"
-        output_msg += f"hash: {shitpost_file_hash}"
-
-    await ctx.respond(output_msg, file=discord.File(fp=shitpost_file, filename=f"shitpost{id}.{shitpost_file_ext}"))
-    shitpost_file.close()
-
 @BillyBot.slash_command(name="sp_pull")
-async def sp_pull(ctx, tags:str=None, keyphrase:str=None):
+async def sp_pull(ctx, shitpost_id:int=None, keyphrase:str=None, tags:str=None, show_details:bool=False):
     """Pulls a shitpost based on matching tags or description."""
-    #if tags is None and keyphrase is None:
-    #    await ctx.respond("Invalid arguments.")
-    #    return
+    await ctx.defer()
+    if shitpost_id is None:
+        sql_cursor.execute("SELECT id, description FROM shitposts_tbl;")
+        shitpost_descriptions = dict(list(sql_cursor))
 
-    sql_cursor.execute("SELECT id, description FROM shitposts_tbl;")
-    shitpost_descriptions = dict(list(sql_cursor))
+        def format_description(desc):
+            output = ""
+            for c in desc.lower():
+                if c.isdigit() or c.isalpha() or c == ' ':
+                    output += c
+                elif c == '_':
+                    output += " "
+            return output
 
-    def format_description(desc):
-        output = ""
-        for c in desc.lower():
-            if c.isdigit() or c.isalpha() or c == ' ':
-                output += c
-            elif c == '_':
-                output += " "
-        return output
-
-    keyword_filter = {}
-    if keyphrase is not None:
-        keyphrase = keyphrase.lower()
-        for sp_id, sp_desc in shitpost_descriptions.items():
-            if keyphrase in sp_desc.lower():
-                keyword_filter[sp_id] = len(keyphrase)
-        if len(keyword_filter) == 0:
-            with open("resources/static/conjuctions.txt", "r") as conjuction_file:
-                conjuction_words = conjuction_file.read().split('\n')
+        keyword_filter = {}
+        if keyphrase is not None:
+            keyphrase = keyphrase.lower()
             for sp_id, sp_desc in shitpost_descriptions.items():
-                for part in keyphrase.split(' '):
-                    part = format_description(part)
-                    if part in format_description(sp_desc) and part not in conjuction_words and part != '':
-                        if sp_id not in keyword_filter:
-                            keyword_filter[sp_id] = len(part)
-                        else:
-                            keyword_filter[sp_id] += len(part)
-        if len(keyword_filter) == 0:
-            await ctx.respond("Could not find shitpost with given tags and keyphrase")
-            return
-
-    output = set()
-    sql_cursor.execute("SELECT tag, sp_shitposts_tags_tbl.shitpost_id FROM sp_tags_tbl INNER JOIN sp_shitposts_tags_tbl ON id = tag_id")
-    shitposts_tags = dict(list(sql_cursor))
-    if tags is not None:
-        tags = tags.upper()
-        tag_list = tags.split(' ')
-        for tag in tag_list:
-            if not sp_valid_tag(tag):
-                await ctx.respond("One or more tags contain illegal characters")
+                if keyphrase in sp_desc.lower():
+                    keyword_filter[sp_id] = len(keyphrase)
+            if len(keyword_filter) == 0:
+                with open("resources/static/conjuctions.txt", "r") as conjuction_file:
+                    conjuction_words = conjuction_file.read().split('\n')
+                for sp_id, sp_desc in shitpost_descriptions.items():
+                    for part in keyphrase.split(' '):
+                        part = format_description(part)
+                        if part in format_description(sp_desc) and part not in conjuction_words and part != '':
+                            if sp_id not in keyword_filter:
+                                keyword_filter[sp_id] = len(part)
+                            else:
+                                keyword_filter[sp_id] += len(part)
+            if len(keyword_filter) == 0:
+                await ctx.respond("Could not find shitpost with given tags and keyphrase")
                 return
 
-        tagged_shitposts = {}
-        max_tagged = 0
-        for sp_tag, sp_id in shitposts_tags.items():
-            if sp_tag in tags:
-                if sp_id not in tagged_shitposts.keys():
-                    tagged_shitposts[sp_id] = 1
-                else:
-                    tagged_shitposts[sp_id] += 1
-                if tagged_shitposts[sp_id] > max_tagged:
-                    max_tagged = tagged_shitposts[sp_id]
+        output = set()
+        sql_cursor.execute("SELECT tag, sp_shitposts_tags_tbl.shitpost_id FROM sp_tags_tbl INNER JOIN sp_shitposts_tags_tbl ON id = tag_id")
+        shitposts_tags = dict(list(sql_cursor))
+        if tags is not None:
+            tags = tags.upper()
+            tag_list = tags.split(' ')
+            for tag in tag_list:
+                if not sp_valid_tag(tag):
+                    await ctx.respond("One or more tags contain illegal characters")
+                    return
 
-        if sum(tagged_shitposts.values()) == 0:
-            await ctx.respond("Could not find shitpost with given tags and keyphrase")
-            return
-        for sp_id in set(tagged_shitposts.keys()).union(set(keyword_filter.keys())):
-            if tagged_shitposts[sp_id] == max_tagged:
-                output.add(sp_id)
+            tagged_shitposts = {}
+            max_tagged = 0
+            for sp_tag, sp_id in shitposts_tags.items():
+                if sp_tag in tags:
+                    if sp_id not in tagged_shitposts.keys():
+                        tagged_shitposts[sp_id] = 1
+                    else:
+                        tagged_shitposts[sp_id] += 1
+                    if tagged_shitposts[sp_id] > max_tagged:
+                        max_tagged = tagged_shitposts[sp_id]
+
+            if sum(tagged_shitposts.values()) == 0:
+                await ctx.respond("Could not find shitpost with given tags and keyphrase")
+                return
+            for sp_id in set(tagged_shitposts.keys()).union(set(keyword_filter.keys())):
+                if tagged_shitposts[sp_id] == max_tagged:
+                    output.add(sp_id)
+        else:
+            output = set(keyword_filter.keys())
+
+        if tags is None and keyphrase is None:
+            output = set(shitposts_tags.values())
+
+        if len(output) > 1:
+            output_message = []
+            for sp_id, sp_desc in shitpost_descriptions.items():
+                if sp_id in output:
+                    output_message.append((sp_id, f"id {sp_id}: {sp_desc}"))
+            output_message = sorted(output_message, key=lambda x: x[0])
+            await ctx.respond("\n".join([part for _, part in output_message]))
+        elif len(output) == 1:
+            await sp_pull_by_id(ctx, output.pop(), show_details=show_details)
     else:
-        output = set(keyword_filter.keys())
-
-    if tags is None and keyphrase is None:
-        output = set(shitposts_tags.values())
-
-    if len(output) > 1:
-        output_message = []
-        for sp_id, sp_desc in shitpost_descriptions.items():
-            if sp_id in output:
-                output_message.append((sp_id, f"id {sp_id}: {sp_desc}"))
-        output_message = sorted(output_message, key=lambda x: x[0])
-        await ctx.respond("\n".join([part for _, part in output_message]))
-    elif len(output) == 1:
-        await sp_pull_by_id(ctx, output.pop())
+        await sp_pull_by_id(ctx, shitpost_id, show_details=show_details)
 
 @BillyBot.slash_command(name="sp_delete_shitpost")
 async def sp_delete_shitpost(ctx, id:int):
