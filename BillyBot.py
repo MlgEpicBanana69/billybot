@@ -589,6 +589,10 @@ def sp_valid_description(description:str) -> bool:
             return False
     return True
 
+def sp_rating_avg(shitpost_id:int) -> float:
+    sql_cursor.execute("SELECT AVG(rating) as avg_rating from sp_rating_tbl where shitpost_id=%s group by shitpost_id", (shitpost_id,))
+    return float(list(sql_cursor)[0][0])
+
 @BillyBot.slash_command(name="sp_modify_user")
 async def sp_modify_user(ctx, discord_user:str, privilege_name:str):
     """
@@ -625,7 +629,27 @@ async def sp_modify_user(ctx, discord_user:str, privilege_name:str):
 
 @BillyBot.slash_command(name="sp_rate_shitpost")
 async def sp_rate_shitpost(ctx, shitpost_id:int, rating:int):
-    pass
+    submitter_id = str(ctx.author.id)
+    if not sp_has_permission(submitter_id, rate=True)[0]:
+        await ctx.respond("Insufficient permissions.")
+        return
+    if (rating < 0 or rating > 100):
+        await ctx.respond("Invalid rating.")
+        return
+    try:
+        sql_cursor.execute("INSERT INTO sp_rating_tbl (rating, submitter_id, shitpost_id) VALUES (%s, %s, %s);", (rating, submitter_id, shitpost_id))
+    except mysql.connector.errors.IntegrityError as err:
+        if err.errno == 1452: # Undefined foreign key
+            await ctx.respond(f"Shitpost of id {shitpost_id} doesn't exist")
+            return
+        elif err.errno == 1062: # Duplicate entry
+            sql_cursor.execute("UPDATE sp_rating_tbl SET rating=%s WHERE submitter_id=%s AND shitpost_id=%s", (rating, submitter_id, shitpost_id))
+        else:
+            raise
+    sql_connection.commit()
+    reply = f"Shitpost {shitpost_id} was given a rating of {rating} points!\nShitpost {shitpost_id} is now rated as {sp_rating_avg(shitpost_id)}"
+    await ctx.respond(reply)
+
 
 @BillyBot.slash_command(name="sp_list_tags")
 async def sp_list_tags(ctx, contains:str="", startswith:str=""):

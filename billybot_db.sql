@@ -82,7 +82,7 @@ CREATE TABLE sp_shitposts_tags_tbl(
 
 CREATE TABLE sp_rating_tbl(
 	entry INT NOT NULL AUTO_INCREMENT,
-	value TINYINT NOT NULL,
+	rating TINYINT NOT NULL,
 	submitter_id VARCHAR(18) NOT NULL,
 	shitpost_id INT NOT NULL,
 	PRIMARY KEY(entry),
@@ -95,7 +95,7 @@ CREATE TABLE sp_rating_tbl(
 		FOREIGN KEY(shitpost_id) REFERENCES shitposts_tbl(id)
 		ON UPDATE CASCADE
 		ON DELETE CASCADE,
-	CONSTRAINT value_legal_rate CHECK (value >= 0 OR value <= 100)
+	CONSTRAINT legal_rating CHECK (rating >= 0 OR rating <= 100)
 );
 
 INSERT INTO sp_user_privileges_tbl
@@ -154,3 +154,6 @@ SELECT sp_users_tbl.discord_user_id, id, name, owner, administrator, submit, rem
 FROM sp_user_privileges_tbl
 INNER JOIN sp_users_tbl
 ON sp_users_tbl.privilege_id = sp_user_privileges_tbl.id;
+
+DELIMITER $
+CREATE FUNCTION shitpost_rating_avg
