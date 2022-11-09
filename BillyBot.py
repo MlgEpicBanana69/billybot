@@ -210,6 +210,7 @@ async def bibi(ctx):
 @BillyBot.slash_command(name="ofekganor")
 async def ofekganor(ctx):
     """Sends a picture of Lord Ofek Ganor in his full glory"""
+    await ctx.defer()
     ofek_images = os.listdir("resources\\static\\ofekganor\\")
     with open("resources\\static\\ofekganor\\" + random.choice(ofek_images), "rb") as ofek_pick:
         await ctx.respond(file=discord.File(fp=ofek_pick, filename="ofek.png"))
