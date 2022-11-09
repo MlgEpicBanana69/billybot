@@ -21,26 +21,21 @@ class BillyBot_osu:
     #region collection management
     def merge_collections(self, *collections):
         """merges n collections together"""
-        collections = list(collections)
         if len(collections) == 1:
             return collections[0]
-        collection_A = collections.pop()
-        collection_B = collections.pop()
-        final_collection = {'': [collection_A[''], collection_B['']]}
-        #assert len(final_collection['']) == 1
-        title_sum = list(dict.fromkeys(list(collection_A.keys()) + list(collection_B.keys())))
-        title_sum.sort()
+        final_collection = {'': [collection.pop('') for collection in collections]}
+        title_sum = sorted(set([key for collection in collections for key in collection.keys()]))
         for title in title_sum:
-            if title != '':
-                final_collection[title] = []
-                if title in collection_A.keys():
-                    final_collection[title] += collection_A[title]
-                if title in collection_B.keys():
-                    final_collection[title] += collection_B[title]
-            final_collection[title] = list(dict.fromkeys(final_collection[title]))
-        final_collection[''] = final_collection[''][-1]
-        collections.append(final_collection)
-        return self.merge_collections(*collections)
+            final_collection[title] = []
+            for collection in collections:
+                if title in collection:
+                    for beatmap in collection[title]:
+                        if beatmap not in final_collection[title]:
+                            final_collection[title].append(beatmap)
+            if len(final_collection[title]) == 0:
+                final_collection.pop(title)
+        final_collection[''] = sorted([ver for ver in final_collection['']], key=self._decode_number, reverse=True)[0].decode('latin1')
+        return final_collection
 
     def dump_collection(self, collection):
         """Converts json collection to binary collection file contents"""
@@ -56,29 +51,32 @@ class BillyBot_osu:
                 output += title.encode()
                 output += encode_number(len(collection[title]))
                 for beatmap in collection[title]:
-                    output += b"\x0b "
-                    output += beatmap.encode()
-                if i < len(collection.keys())-2:
                     output += b"\x0b"
+                    output += chr(len(beatmap)).encode()
+                    if (len(beatmap) != 32):
+                        print("faggot")
+                    output += beatmap.encode()
+                output += b"\x0b"
+                #if i < len(collection.keys())-2:
+                #    output += b"\x0b"
         return output
 
     def read_collection(self, collection_db):
         """Parses a collection.db file formatted binaries to json"""
         output = {}
         version = collection_db[:4:]
-        decode_number = lambda x: sum([(b*256**i)for i, b in enumerate(x)])
-        collections_count = decode_number(collection_db[4:8:])
+        collections_count = self._decode_number(collection_db[4:8:])
         collection_db = collection_db[9::]
         index = 0
         for collection in range(collections_count):
             title = collection_db[index+1:collection_db[index]+index+1].decode()
-            collection_size = decode_number(collection_db[index+len(title)+1:index+len(title)+5:])
+            collection_size = self._decode_number(collection_db[index+len(title)+1:index+len(title)+5:])
             output[title] = []
             index += 1 + len(title) + 5
             for beatmap in range(collection_size):
                 output[title].append(collection_db[index+1:index+33].lstrip().decode())
                 index += 33+1
-        output[''] = version.decode()
+        output[''] = version
         return output
     #endregion
 
@@ -187,6 +185,8 @@ class BillyBot_osu:
 
         return term
 
+    def _decode_number(self, b_num:bytes) -> int:
+        return sum([(b*256**i)for i, b in enumerate(b_num)])
 if __name__ == '__main__':
     osu = BillyBot_osu("")
     with open("O:\\osu!\\collection.db", "rb") as f:

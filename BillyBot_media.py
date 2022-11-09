@@ -46,9 +46,6 @@ class Media:
         self.source_route()
         assert self._route_type is not None
 
-    def __call__(self):
-        return self.get_content()
-
     def __str__(self):
         return self.__repr__()
 
@@ -213,13 +210,12 @@ class Media:
                     output_data = video_contents
                 else:
                     self._content = None
-                    return False
-
+                    return None
             self._content = output_data
         else:
             with open(self._local, "rb") as local_file:
                 self._content = local_file.read()
-        return True
+        return self._content
 
     def generate_stream(self) -> bool:
         """Generates the audio stream for the media object

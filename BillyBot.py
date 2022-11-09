@@ -533,7 +533,7 @@ async def love(ctx, user):
 async def merge_collections(ctx, collections):
     """Merges the given osu collection.db files together"""
     await ctx.defer()
-    collections = [bb_media.Static(collection)() for collection in collections.split()]
+    collections = [bb_media.Media(collection).fetch_file() for collection in collections.split()]
     final_collection = bb_osu.merge_collections(*[bb_osu.read_collection(collection_db) for collection_db in collections])
     file_contents = bb_osu.dump_collection(final_collection)
     await ctx.respond(f"Merged {len(collections)} collections", file=discord.File(fp=io.BytesIO(file_contents), filename="collection.db"))
