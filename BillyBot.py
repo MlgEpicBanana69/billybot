@@ -778,7 +778,7 @@ async def sp_pull(ctx, shitpost_id:int=None, keyphrase:str=None, tags:str=None, 
 
         output = set()
         sql_cursor.execute("SELECT tag, sp_shitposts_tags_tbl.shitpost_id FROM sp_tags_tbl INNER JOIN sp_shitposts_tags_tbl ON id = tag_id")
-        shitposts_tags = dict(list(sql_cursor))
+        shitposts_tags = list(sql_cursor)
         if tags is not None:
             tags = tags.upper()
             tag_list = tags.split(' ')
@@ -789,7 +789,8 @@ async def sp_pull(ctx, shitpost_id:int=None, keyphrase:str=None, tags:str=None, 
 
             tagged_shitposts = {}
             max_tagged = 0
-            for sp_tag, sp_id in shitposts_tags.items():
+            for tup in shitposts_tags:
+                sp_tag, sp_id = tup
                 if sp_tag in tags:
                     if sp_id not in tagged_shitposts.keys():
                         tagged_shitposts[sp_id] = 1
@@ -808,7 +809,7 @@ async def sp_pull(ctx, shitpost_id:int=None, keyphrase:str=None, tags:str=None, 
             output = set(keyword_filter.keys())
 
         if tags is None and keyphrase is None:
-            output = set(shitposts_tags.values())
+            output = set([tup[1] for tup in shitposts_tags])
 
         if len(output) > 1:
             output_message = []
