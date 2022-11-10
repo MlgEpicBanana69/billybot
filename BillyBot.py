@@ -1,22 +1,22 @@
+import asyncio
+import hashlib
 import io
 import os
 import random
 
-import discord
-from discord.ext import commands
-import asyncio
-from dotenv import load_dotenv
 import cv2
-import numpy as np
-import validators
-import hashlib
+import discord
 import mysql.connector
+import numpy as np
 import requests
+import validators
 from bs4 import BeautifulSoup
+from discord.ext import commands
+from dotenv import load_dotenv
 
-import BillyBot_utils as bb_utils
 import BillyBot_games as bb_games
 import BillyBot_media as bb_media
+import BillyBot_utils as bb_utils
 from BillyBot_osu import BillyBot_osu
 
 # Ideas:

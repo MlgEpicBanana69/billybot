@@ -1,10 +1,11 @@
-import os
 import json
-from typing import final
-import requests
-import browser_cookie3
+import os
 import re
 from winreg import HKEY_CURRENT_USER, OpenKey, QueryValueEx
+
+import browser_cookie3
+import requests
+
 
 class BillyBot_osu:
     def __init__(self, api_key:str):

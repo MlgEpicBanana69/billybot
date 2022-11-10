@@ -1,5 +1,6 @@
 import random
 
+
 class Minesweeper:
     """BillyBot's gateway to everything minesweeper"""
     def _column_of_tile(self, tile):

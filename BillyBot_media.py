@@ -1,17 +1,17 @@
+import mimetypes
+import os
 import random
 import re
-import requests
-import mimetypes
-import validators
-from youtube_dl import YoutubeDL
-from urllib.parse import urlparse
-import discord
-from discord.utils import get
-import ffmpeg
-import os
-import io
 import tempfile
 import threading
+from urllib.parse import urlparse
+
+import discord
+import ffmpeg
+import requests
+import validators
+from discord.utils import get
+from youtube_dl import YoutubeDL
 
 mimetypes.init()
 
