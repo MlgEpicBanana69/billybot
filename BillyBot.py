@@ -5,6 +5,7 @@ import os
 import random
 
 import cv2
+import datetime
 import discord
 import mysql.connector
 import numpy as np
@@ -80,11 +81,10 @@ async def on_message(message):
                 keyphrase = message.content.replace(BillyBot.user.mention, '').strip()
                 keyphrase = "".join([c for c in keyphrase if c.isalpha() or c == ' '])
 
-                cyber_response = cyber_intimidation(message, keyphrase)
+                cyber_response = await cyber_intimidation(message, keyphrase)
                 respond_table = [cyber_response]
                 for val in respond_table:
                     if val is not None:
-                        await asyncio.sleep(2)
                         await message.channel.send(val)
                         break
 
@@ -741,7 +741,6 @@ async def sp_delete_tag(ctx, tag:str):
 @BillyBot.slash_command(name="sp_pull")
 async def sp_pull(ctx, shitpost_id:int=None, keyphrase:str=None, tags:str=None, show_details:bool=False):
     """Pulls a shitpost based on matching tags or description."""
-    await ctx.defer()
     if shitpost_id is None:
         sql_cursor.execute("SELECT id, description FROM shitposts_tbl;")
         shitpost_descriptions = dict(list(sql_cursor))
@@ -817,7 +816,7 @@ async def sp_pull(ctx, shitpost_id:int=None, keyphrase:str=None, tags:str=None, 
                 if sp_id in output:
                     output_message.append((sp_id, f"id {sp_id}: {sp_desc}"))
             output_message = sorted(output_message, key=lambda x: x[0])
-            await ctx.respond("\n".join([part for _, part in output_message]))
+            await ctx.send_response("\n".join([part for _, part in output_message]), ephemeral=True)
         elif len(output) == 1:
             await sp_pull_by_id(ctx, output.pop(), show_details=show_details)
     else:
@@ -914,25 +913,22 @@ async def shitpost(ctx, src:str, tags:str, description:str):
 #endregion
 
 #region intimidation responses
-def cyber_intimidation(message, keyphrase):
+async def cyber_intimidation(message, keyphrase):
     insults = None
     with open("resources/static/billy_insults.txt", mode="r", encoding='utf-8') as f:
         insults = f.read().split('\n')
+    with open("resources/static/cyber_intimidation.txt", mode="r") as f:
+        cyber_msg = f.read()
+    rip_bozo_gif_url = "https://tenor.com/view/rip-bozo-gif-22294771"
+    output_msg = f"{message.author.mention} this you?\n\n{cyber_msg}\n{repr(message)}\n\n{rip_bozo_gif_url}"
+
     for insult in insults:
         if insult in keyphrase:
-            return f"""{message.author.mention} this you?\n{repr(message)}
-Connection-specific DNS Suffix  . :
-IPv6 Address. . . . . . . . . . . . . . . . . : f5d0:c4aa:ce18:12fc:
-IPv6 Address. . . . . . . . . . . . . . . . . : 3067:cdf0:fc0d:8e69:8a12:9536:f122:d92f
-Temporary IPv6 Address. . . . . . : 99a9:9d54:7497:fc7f:6a37:3983:
-Link-local IPv6 Address . . . . . . . : 4612:12f4:9830:86fc:4449:3a6b:tr72%7
-IPv4 Address. . . . . . . . . . . . . . . . . : 192.168.1.27
-Subnet Mask. . . . . . . . . . . . . . . . . : 255.255.255.0
-Default Gateway . . . . . . . . . . . . . : fe80::384ff:4300:0a77:0d79 :: 192.168.1.1
-{repr(message.author)}
-
-https://tenor.com/view/rip-bozo-gif-22294771
-"""
+            try:
+                await message.author.timeout(until = discord.utils.utcnow() + datetime.timedelta(seconds=20), reason="RIP BOZO")
+            except discord.errors.Forbidden:
+                pass # We don't have permission to ban the caller
+            return output_msg
     else:
         return None
 # endregion
