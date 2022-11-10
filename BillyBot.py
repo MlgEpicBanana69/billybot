@@ -594,6 +594,10 @@ def sp_rating_avg(shitpost_id:int) -> float:
     sql_cursor.execute("SELECT AVG(rating) as avg_rating from sp_rating_tbl where shitpost_id=%s group by shitpost_id", (shitpost_id,))
     return float(list(sql_cursor)[0][0])
 
+def sp_shitpost_tags(shitpost_id:int) -> list:
+    sql_cursor.execute("SELECT sp_tags_tbl.tag FROM sp_shitposts_tags_tbl INNER JOIN sp_tags_tbl ON sp_tags_tbl.id = sp_shitposts_tags_tbl.tag_id WHERE shitpost_id = %s", (shitpost_id,))
+    return [item for sublist in sql_cursor for item in sublist]
+
 async def sp_pull_by_id(ctx, id:int, show_details:bool=False):
     """Pulls a shitpost by its ID"""
     insufficient_privileges = sp_has_permission(str(ctx.author.id), query=False) # Check if user cannot query
@@ -601,7 +605,6 @@ async def sp_pull_by_id(ctx, id:int, show_details:bool=False):
         await ctx.respond("Insufficient privileges")
         return
 
-    assert type(id) == int
     output_msg = ""
     sql_cursor.execute("SELECT * FROM shitposts_tbl WHERE id=%s", (id,))
     shitpost = [key for subl in list(sql_cursor) for key in subl]
@@ -620,6 +623,7 @@ async def sp_pull_by_id(ctx, id:int, show_details:bool=False):
         shitpost["submitter"] = await BillyBot.fetch_user(int(shitpost["submitter"]))
         for key, value in shitpost.items():
             output_msg += f"{key}: {value}\n"
+        output_msg += f"tags: {' '.join(sp_shitpost_tags(id))}\n"
         output_msg += f"hash: {shitpost_file_hash}"
 
     await ctx.respond(output_msg, file=discord.File(fp=shitpost_file, filename=f"shitpost{id}.{shitpost_file_ext}"))
