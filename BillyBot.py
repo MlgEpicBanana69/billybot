@@ -531,7 +531,7 @@ async def love(ctx, user):
 #region osu commands
 @BillyBot.slash_command(name="mergecollections")
 async def merge_collections(ctx, collections):
-    """Merges the given osu collection.db files together"""
+    """Merges the given osu collection.db files together (Currently doesn't work because osu databases fucking suck)"""
     await ctx.defer()
     collections = [bb_media.Media(collection).fetch_file() for collection in collections.split()]
     final_collection = bb_osu.merge_collections(*[bb_osu.read_collection(collection_db) for collection_db in collections])
