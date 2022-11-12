@@ -602,14 +602,14 @@ async def sp_pull_by_id(ctx, id:int, show_details:bool=False):
     """Pulls a shitpost by its ID"""
     insufficient_privileges = sp_has_permission(str(ctx.author.id), query=False) # Check if user cannot query
     if insufficient_privileges[0] or not insufficient_privileges[1]:
-        await ctx.respond("Insufficient privileges")
+        await ctx.send_followup("Insufficient privileges", ephemeral=True, delete_after=10)
         return
 
     output_msg = ""
     sql_cursor.execute("SELECT * FROM shitposts_tbl WHERE id=%s", (id,))
     shitpost = [key for subl in list(sql_cursor) for key in subl]
     if len(shitpost) == 0:
-        await ctx.respond("Shitpost with given ID not found.")
+        await ctx.send_followup("Shitpost with given ID not found.", ephemeral=True, delete_after=10)
         return
     shitpost_file_hash = shitpost.pop(1)
     shitpost_file_ext = shitpost.pop(1)
@@ -617,6 +617,7 @@ async def sp_pull_by_id(ctx, id:int, show_details:bool=False):
     shitpost_file_ext = list(sql_cursor)[0][0]
 
     shitpost_file = open(f"resources/dynamic/shitposts/shitpost{id}.{shitpost_file_ext}", "rb")
+    await ctx.channel.send("", file=discord.File(fp=shitpost_file, filename=f"shitpost{id}.{shitpost_file_ext}"))
 
     if show_details:
         shitpost = dict(zip(("id", "submitter", "description"), shitpost))
@@ -625,8 +626,10 @@ async def sp_pull_by_id(ctx, id:int, show_details:bool=False):
             output_msg += f"{key}: {value}\n"
         output_msg += f"tags: {' '.join(sp_shitpost_tags(id))}\n"
         output_msg += f"hash: {shitpost_file_hash}"
+        await ctx.send_followup(output_msg)
+    else:
+        await ctx.send_followup("Shitpost pulled succesfully.", ephemeral=True, delete_after=1)
 
-    await ctx.respond(output_msg, file=discord.File(fp=shitpost_file, filename=f"shitpost{id}.{shitpost_file_ext}"))
     shitpost_file.close()
 
 @BillyBot.slash_command(name="sp_modify_user")
@@ -741,6 +744,7 @@ async def sp_delete_tag(ctx, tag:str):
 @BillyBot.slash_command(name="sp_pull")
 async def sp_pull(ctx, shitpost_id:int=None, keyphrase:str=None, tags:str=None, show_details:bool=False):
     """Pulls a shitpost based on matching tags or description."""
+    await ctx.defer(ephemeral=True)
     if shitpost_id is None:
         sql_cursor.execute("SELECT id, description FROM shitposts_tbl;")
         shitpost_descriptions = dict(list(sql_cursor))
@@ -772,7 +776,7 @@ async def sp_pull(ctx, shitpost_id:int=None, keyphrase:str=None, tags:str=None, 
                             else:
                                 keyword_filter[sp_id] += len(part)
             if len(keyword_filter) == 0:
-                await ctx.respond("Could not find shitpost with given tags and keyphrase")
+                await ctx.send_followup("Could not find shitpost with given tags and keyphrase", ephemeral=True, delete_after=10)
                 return
 
         output = set()
@@ -783,7 +787,7 @@ async def sp_pull(ctx, shitpost_id:int=None, keyphrase:str=None, tags:str=None, 
             tag_list = tags.split(' ')
             for tag in tag_list:
                 if not sp_valid_tag(tag):
-                    await ctx.respond("One or more tags contain illegal characters")
+                    await ctx.send_followup("One or more tags contain illegal characters", ephemeral=True, delete_after=10)
                     return
 
             tagged_shitposts = {}
@@ -799,7 +803,7 @@ async def sp_pull(ctx, shitpost_id:int=None, keyphrase:str=None, tags:str=None, 
                         max_tagged = tagged_shitposts[sp_id]
 
             if sum(tagged_shitposts.values()) == 0:
-                await ctx.respond("Could not find shitpost with given tags and keyphrase")
+                await ctx.send_followup("Could not find shitpost with given tags and keyphrase", ephemeral=True, delete_after=10)
                 return
             for sp_id in set(tagged_shitposts.keys()).union(set(keyword_filter.keys())):
                 if tagged_shitposts[sp_id] == max_tagged:
@@ -816,7 +820,7 @@ async def sp_pull(ctx, shitpost_id:int=None, keyphrase:str=None, tags:str=None, 
                 if sp_id in output:
                     output_message.append((sp_id, f"id {sp_id}: {sp_desc}"))
             output_message = sorted(output_message, key=lambda x: x[0])
-            await ctx.send_response("\n".join([part for _, part in output_message]), ephemeral=True)
+            await ctx.send_followup("\n".join([part for _, part in output_message]), ephemeral=True)
         elif len(output) == 1:
             await sp_pull_by_id(ctx, output.pop(), show_details=show_details)
     else:
