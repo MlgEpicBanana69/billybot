@@ -531,7 +531,7 @@ async def love(ctx, user):
 #region osu commands
 @BillyBot.slash_command(name="mergecollections")
 async def merge_collections(ctx, collections):
-    """Merges the given osu collection.db files together (Currently doesn't work because osu databases fucking suck)"""
+    """Merges the given osu collection.db files together (Currently doesn't work)"""
     await ctx.defer()
     collections = [bb_media.Media(collection).fetch_file() for collection in collections.split()]
     final_collection = bb_osu.merge_collections(*[bb_osu.read_collection(collection_db) for collection_db in collections])
@@ -628,7 +628,7 @@ async def sp_pull_by_id(ctx, id:int, show_details:bool=False):
         output_msg += f"hash: {shitpost_file_hash}"
         await ctx.send_followup(output_msg)
     else:
-        await ctx.send_followup("Shitpost pulled succesfully.", ephemeral=True, delete_after=1)
+        await ctx.send_followup("Shitpost pulled succesfully.", ephemeral=True)
 
     shitpost_file.close()
 
@@ -742,7 +742,7 @@ async def sp_delete_tag(ctx, tag:str):
     await ctx.respond(f"Deleted tag *{tag}*")
 
 @BillyBot.slash_command(name="sp_pull")
-async def sp_pull(ctx, shitpost_id:int=None, keyphrase:str=None, tags:str=None, show_details:bool=False):
+async def sp_pull(ctx, shitpost_id:int=None, keyphrase:str=None, tags:str=None, choose_random:bool=False, show_details:bool=False):
     """Pulls a shitpost based on matching tags or description."""
     await ctx.defer(ephemeral=True)
     if shitpost_id is None:
@@ -813,6 +813,9 @@ async def sp_pull(ctx, shitpost_id:int=None, keyphrase:str=None, tags:str=None, 
 
         if tags is None and keyphrase is None:
             output = set([tup[1] for tup in shitposts_tags])
+
+        if choose_random:
+            output = random.sample(output, 1)
 
         if len(output) > 1:
             output_message = []
