@@ -692,7 +692,7 @@ async def sp_rate(ctx, shitpost_id:int, rating:int):
 @BillyBot.slash_command(name="sp_list_tags")
 async def sp_list_tags(ctx, contains:str="", startswith:str=""):
     """Sends a list of legal tags that contains the given string"""
-    await ctx.defer()
+    await ctx.defer(ephemeral=True)
     author_has_permission = sp_has_permission(str(ctx.author.id), query=True)
     author_has_permission = author_has_permission[0] or not author_has_permission[1]
 
@@ -702,9 +702,9 @@ async def sp_list_tags(ctx, contains:str="", startswith:str=""):
     # NOTE: Try using fetchall
     tag_list = "\n".join([tag for subl in list(sql_cursor) for tag in subl if (contains in tag) and (tag.startswith(startswith))])
     if len(tag_list) > 0:
-        await ctx.respond(tag_list)
+        await ctx.send_followup(tag_list, ephemeral=True)
     else:
-        await ctx.respond("No tags were found using the given filter.")
+        await ctx.send_followup("No tags were found using the given filter.", ephemeral=True)
 
 @BillyBot.slash_command(name="sp_add_tag")
 async def sp_add_tag(ctx, tag:str):
