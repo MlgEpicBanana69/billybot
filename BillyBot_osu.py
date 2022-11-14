@@ -35,7 +35,7 @@ class BillyBot_osu:
                             final_collection[title].append(beatmap)
             if len(final_collection[title]) == 0:
                 final_collection.pop(title)
-        final_collection[''] = sorted([ver for ver in final_collection['']], key=self._decode_number, reverse=True)[0].decode('latin1')
+        final_collection[''] = max(final_collection[''], key=self._decode_number)
         return final_collection
 
     def dump_collection(self, collection):
@@ -43,39 +43,39 @@ class BillyBot_osu:
         collections_count = len(collection)-1
         encode_number = lambda n: b"".join([chr((n // 256**i) % 256).encode('latin1') for i in range(4)])
         version = collection['']
-        output = version.encode()
+        output = version.encode(encoding="latin1")
         output += encode_number(collections_count)
-        output += b"\x0b"
         for i, title in enumerate(collection.keys()):
             if title != '':
+                output += b"\x0b"
                 output += chr(len(title)).encode()
                 output += title.encode()
                 output += encode_number(len(collection[title]))
                 for beatmap in collection[title]:
                     output += b"\x0b"
                     output += chr(len(beatmap)).encode()
-                    if (len(beatmap) != 32):
-                        print("faggot")
                     output += beatmap.encode()
-                output += b"\x0b"
-                #if i < len(collection.keys())-2:
-                #    output += b"\x0b"
         return output
 
     def read_collection(self, collection_db):
         """Parses a collection.db file formatted binaries to json"""
         output = {}
+        try:
+            collection_db = collection_db.decode(encoding="latin1")
+        except UnicodeDecodeError:
+            collection_db = collection_db.decode(encoding="utf-8")
+            print("bruh")
         version = collection_db[:4:]
         collections_count = self._decode_number(collection_db[4:8:])
         collection_db = collection_db[9::]
         index = 0
         for collection in range(collections_count):
-            title = collection_db[index+1:collection_db[index]+index+1].decode()
+            title = collection_db[index+1:ord(collection_db[index])+index+1]
             collection_size = self._decode_number(collection_db[index+len(title)+1:index+len(title)+5:])
             output[title] = []
             index += 1 + len(title) + 5
             for beatmap in range(collection_size):
-                output[title].append(collection_db[index+1:index+33].lstrip().decode())
+                output[title].append(collection_db[index+1:index+33].lstrip())
                 index += 33+1
         output[''] = version
         return output
@@ -186,8 +186,8 @@ class BillyBot_osu:
 
         return term
 
-    def _decode_number(self, b_num:bytes) -> int:
-        return sum([(b*256**i)for i, b in enumerate(b_num)])
+    def _decode_number(self, b_num:str) -> int:
+        return sum([(ord(b)*256**i)for i, b in enumerate(b_num)])
 if __name__ == '__main__':
     osu = BillyBot_osu("")
     with open("O:\\osu!\\collection.db", "rb") as f:
