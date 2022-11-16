@@ -38,6 +38,8 @@ intents = discord.Intents.all()
 BillyBot = discord.Bot(intents=intents)
 
 BOT_DISCORD_FILE_LIMIT = bb_media.Media.DISCORD_FILE_LIMITERS[0]
+DISCORD_MESSAGE_SIZE_LIMITS = (2000,)
+BOT_DISCORD_MESSAGE_SIZE_LIMIT = DISCORD_MESSAGE_SIZE_LIMITS[0]
 
 # Every auto list contains a two dimension tuple containing the member id and guild id
 # (id, guild_id)
@@ -598,7 +600,7 @@ def sp_shitpost_tags(shitpost_id:int) -> list:
     sql_cursor.execute("SELECT sp_tags_tbl.tag FROM sp_shitposts_tags_tbl INNER JOIN sp_tags_tbl ON sp_tags_tbl.id = sp_shitposts_tags_tbl.tag_id WHERE shitpost_id = %s", (shitpost_id,))
     return [item for sublist in sql_cursor for item in sublist]
 
-async def sp_pull_by_id(ctx, id:int, show_details:bool=False):
+async def sp_pull_by_id(ctx, id:int, get_details:bool=False):
     """Pulls a shitpost by its ID"""
     insufficient_privileges = sp_has_permission(str(ctx.author.id), query=False) # Check if user cannot query
     if insufficient_privileges[0] or not insufficient_privileges[1]:
@@ -617,9 +619,8 @@ async def sp_pull_by_id(ctx, id:int, show_details:bool=False):
     shitpost_file_ext = list(sql_cursor)[0][0]
 
     shitpost_file = open(f"resources/dynamic/shitposts/shitpost{id}.{shitpost_file_ext}", "rb")
-    await ctx.channel.send("", file=discord.File(fp=shitpost_file, filename=f"shitpost{id}.{shitpost_file_ext}"))
 
-    if show_details:
+    if get_details:
         shitpost = dict(zip(("id", "submitter", "description"), shitpost))
         shitpost["submitter"] = await BillyBot.fetch_user(int(shitpost["submitter"]))
         for key, value in shitpost.items():
@@ -628,6 +629,7 @@ async def sp_pull_by_id(ctx, id:int, show_details:bool=False):
         output_msg += f"hash: {shitpost_file_hash}"
         await ctx.send_followup(output_msg)
     else:
+        await ctx.channel.send("", file=discord.File(fp=shitpost_file, filename=f"shitpost{id}.{shitpost_file_ext}"))
         await ctx.send_followup("Shitpost pulled succesfully.", ephemeral=True)
 
     shitpost_file.close()
@@ -742,7 +744,7 @@ async def sp_delete_tag(ctx, tag:str):
     await ctx.respond(f"Deleted tag *{tag}*")
 
 @BillyBot.slash_command(name="sp_pull")
-async def sp_pull(ctx, shitpost_id:int=None, keyphrase:str=None, tags:str=None, choose_random:bool=False, show_details:bool=False):
+async def sp_pull(ctx, shitpost_id:int=None, keyphrase:str=None, tags:str=None, choose_random:bool=False, get_details:bool=False):
     """Pulls a shitpost based on matching tags or description."""
     await ctx.defer(ephemeral=True)
     if shitpost_id is None:
@@ -823,11 +825,12 @@ async def sp_pull(ctx, shitpost_id:int=None, keyphrase:str=None, tags:str=None, 
                 if sp_id in output:
                     output_message.append((sp_id, f"id {sp_id}: {sp_desc}"))
             output_message = sorted(output_message, key=lambda x: x[0])
-            await ctx.send_followup("\n".join([part for _, part in output_message]), ephemeral=True)
+            output_message = "\n".join([part for _, part in output_message])
+            await ctx.send_followup(output_message[:2000-8] + "\n**...**", ephemeral=True)
         elif len(output) == 1:
-            await sp_pull_by_id(ctx, output.pop(), show_details=show_details)
+            await sp_pull_by_id(ctx, output.pop(), get_details=get_details)
     else:
-        await sp_pull_by_id(ctx, shitpost_id, show_details=show_details)
+        await sp_pull_by_id(ctx, shitpost_id, get_details=get_details)
 
 @BillyBot.slash_command(name="sp_delete_shitpost")
 async def sp_delete_shitpost(ctx, id:int):
@@ -864,9 +867,8 @@ async def shitpost(ctx, src:str, tags:str, description:str):
     # TODO: DEBUG HERE
     media = bb_media.Media(src)
     if media.get_route_type() in (bb_media.Media.GENERIC_AUDIO, bb_media.Media.GENERIC_VIDEO, bb_media.Media.GENERIC_IMAGE):
-        try:
-            media.fetch_file(BOT_DISCORD_FILE_LIMIT)
-        except AssertionError:
+        media.fetch_file(BOT_DISCORD_FILE_LIMIT)
+        if media.get_content() is None:
             await ctx.respond(f"Source too large for discord (>~{BOT_DISCORD_FILE_LIMIT//1000000}MiB)")
             return
     else:

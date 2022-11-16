@@ -156,7 +156,8 @@ class Media:
             ultimate_sources = self.get_ultimate_sources(no_video=no_video, sizelimit=size_limit)
             def download_source(source:str):
                 resp = requests.get(source, stream=True)
-                resp.raise_for_status()
+                if resp.status_code != 200:
+                    return None
                 contents = bytes()
                 # 4MB (4194304)
                 curr_size = 0
@@ -279,7 +280,8 @@ class Media:
                         if not is_video:
                             assert x['acodec'] != 'none'
                         else:
-                            assert x['acodec'] == 'none'
+                            # assert x['acodec'] == 'none'
+                            pass
                     if 'vcodec' in x:
                         if is_video:
                             assert x['vcodec'] != 'none'
