@@ -418,23 +418,73 @@ async def leave(ctx):
 # endregion
 
 #region Processing commands
+#@BillyBot.slash_command(name="cyber")
+#async def cyber(ctx, args=""):
+#    """Overlays the text סייבר on a given image."""
+#
+#    await ctx.defer()
+#    message_sources = [arg for arg in args.split(' ') if validators.url(arg)]
+#    img_objects = []
+#    for i, source in enumerate(message_sources):
+#        image_obj = bb_media.Media(source)
+#        if image_obj is not None:
+#            if image_obj.get_route_type() == bb_media.Media.GENERIC_IMAGE:
+#                image_obj.fetch_file(BOT_DISCORD_FILE_LIMIT)
+#                nparr = np.frombuffer(image_obj.get_content(), np.uint8)
+#                cv2_img = cv2.imdecode(nparr, cv2.IMREAD_UNCHANGED)
+#                if len(cv2_img[0][0]) < 4:
+#                    cv2_img = cv2.cvtColor(cv2_img, cv2.COLOR_RGB2RGBA)
+#                img_objects.append(cv2_img)
+#            else:
+#                # Discard unsupported static media formats
+#                message_sources.pop(i)
+#    if (len(message_sources) == 0):
+#        await ctx.respond("You must attach an image file or pass a link as the last argument to the command message!")
+#        return
+#
+#    # processing and final sending goes here!
+#    for current_img in img_objects:
+#        foreground_image = cv2.imread(
+#            "resources\\static\\foreground.png", cv2.IMREAD_UNCHANGED)
+#        foreground_img_ratio = foreground_image.shape[1] / \
+#            foreground_image.shape[0]
+#        if current_img.shape[1] >= current_img.shape[0]:
+#            foreground_image = cv2.resize(foreground_image, (int(
+#                foreground_img_ratio * current_img.shape[0]), current_img.shape[0]), interpolation=cv2.INTER_AREA)
+#        else:
+#            foreground_image = cv2.resize(foreground_image, (current_img.shape[1], int(
+#                foreground_img_ratio ** -1 * current_img.shape[1])), interpolation=cv2.INTER_AREA)
+#        for row in range(foreground_image.shape[0]):
+#            for col in range(foreground_image.shape[1]):
+#                try:
+#                    row_offset = current_img.shape[0] - \
+#                        foreground_image.shape[0]
+#                    col_offset = (
+#                        current_img.shape[1] - foreground_image.shape[1]) // 2
+#                    if (foreground_image[row, col][3] == 255):
+#                        current_img[row + row_offset, col +
+#                                    col_offset] = foreground_image[row, col]
+#                    elif (foreground_image[row, col][3] == 0):
+#                        pass
+#                    else:
+#                        current_img[row + row_offset, col + col_offset] = bb_utils.merge_pixels(
+#                            foreground_image[row, col], current_img[row + row_offset, col + col_offset])
+#                except IndexError:
+#                    pass
+#        await ctx.respond(content="", file=discord.File(fp=io.BytesIO(cv2.imencode(".png", current_img)[1].tobytes()), filename="outputImage.png"))
+#
 @BillyBot.slash_command(name="cyber")
 async def cyber(ctx, args=""):
-    """Overlays the text סייבר on a given image."""
-
     await ctx.defer()
     message_sources = [arg for arg in args.split(' ') if validators.url(arg)]
     img_objects = []
     for i, source in enumerate(message_sources):
         image_obj = bb_media.Media(source)
         if image_obj is not None:
-            if image_obj.get_route_type() == bb_media.Media.GENERIC_IMAGE:
+            if image_obj.get_route_type() in bb_media.Media.GENERIC_IMAGE:
                 image_obj.fetch_file(BOT_DISCORD_FILE_LIMIT)
-                nparr = np.frombuffer(image_obj.get_content(), np.uint8)
-                cv2_img = cv2.imdecode(nparr, cv2.IMREAD_UNCHANGED)
-                if len(cv2_img[0][0]) < 4:
-                    cv2_img = cv2.cvtColor(cv2_img, cv2.COLOR_RGB2RGBA)
-                img_objects.append(cv2_img)
+                image_obj.overlay_text("cyber")
+                img_objects.append(image_obj)
             else:
                 # Discard unsupported static media formats
                 message_sources.pop(i)
@@ -442,36 +492,6 @@ async def cyber(ctx, args=""):
         await ctx.respond("You must attach an image file or pass a link as the last argument to the command message!")
         return
 
-    # processing and final sending goes here!
-    for current_img in img_objects:
-        foreground_image = cv2.imread(
-            "resources\\static\\foreground.png", cv2.IMREAD_UNCHANGED)
-        foreground_img_ratio = foreground_image.shape[1] / \
-            foreground_image.shape[0]
-        if current_img.shape[1] >= current_img.shape[0]:
-            foreground_image = cv2.resize(foreground_image, (int(
-                foreground_img_ratio * current_img.shape[0]), current_img.shape[0]), interpolation=cv2.INTER_AREA)
-        else:
-            foreground_image = cv2.resize(foreground_image, (current_img.shape[1], int(
-                foreground_img_ratio ** -1 * current_img.shape[1])), interpolation=cv2.INTER_AREA)
-        for row in range(foreground_image.shape[0]):
-            for col in range(foreground_image.shape[1]):
-                try:
-                    row_offset = current_img.shape[0] - \
-                        foreground_image.shape[0]
-                    col_offset = (
-                        current_img.shape[1] - foreground_image.shape[1]) // 2
-                    if (foreground_image[row, col][3] == 255):
-                        current_img[row + row_offset, col +
-                                    col_offset] = foreground_image[row, col]
-                    elif (foreground_image[row, col][3] == 0):
-                        pass
-                    else:
-                        current_img[row + row_offset, col + col_offset] = bb_utils.merge_pixels(
-                            foreground_image[row, col], current_img[row + row_offset, col + col_offset])
-                except IndexError:
-                    pass
-        await ctx.respond(content="", file=discord.File(fp=io.BytesIO(cv2.imencode(".png", current_img)[1].tobytes()), filename="outputImage.png"))
 # endregion
 
 #region Personal management
