@@ -584,6 +584,30 @@ def sp_valid_tag(tag:str) -> bool:
             return False
     return True
 
+def sp_add_shitpost_tags(shitpost_id: int, tags:list) -> bool:
+    sql_cursor.execute("SELECT tag, id FROM sp_tags_tbl;")
+    tag_list = list(sql_cursor)
+    assert len(tag_list) > 0
+    tag_list = dict(tag_list)
+
+    for tag in tags:
+        if tag not in tag_list:
+            print("flag!")
+        sql_cursor.execute("INSERT INTO sp_shitposts_tags_tbl (tag_id, shitpost_id) VALUES (%s, %s);", (tag_list[tag], shitpost_id))
+
+def sp_remove_shitpost_tag(shitpost_id: int, tags:list) -> bool:
+    sql_cursor.execute("SELECT tag, id FROM sp_tags_tbl;")
+    tag_list = list(sql_cursor)
+    assert len(tag_list) > 0
+    tag_list = dict(tag_list)
+
+    sql_cursor.execute("SELECT tag_id FROM sp_shitposts_tags_tbl WHERE shitpost_id=%s", (shitpost_id,))
+    sp_tag_list = list(sql_cursor)
+    assert len(sp_tag_list) > len(tags)
+
+    for tag in tags:
+        sql_cursor.execute("DELETE FROM sp_shitposts_tags_tbl WHERE shitpost_id=%s AND tag_id=%s", (shitpost_id, tag_list[tag]))
+
 def sp_valid_description(description:str) -> bool:
     if len(description) < 16 or len(description) > 255:
         return False
@@ -602,11 +626,6 @@ def sp_shitpost_tags(shitpost_id:int) -> list:
 
 async def sp_pull_by_id(ctx, id:int, get_details:bool=False):
     """Pulls a shitpost by its ID"""
-    insufficient_privileges = sp_has_permission(str(ctx.author.id), query=False) # Check if user cannot query
-    if insufficient_privileges[0] or not insufficient_privileges[1]:
-        await ctx.send_followup("Insufficient privileges", ephemeral=True, delete_after=10)
-        return
-
     output_msg = ""
     sql_cursor.execute("SELECT * FROM shitposts_tbl WHERE id=%s", (id,))
     shitpost = [key for subl in list(sql_cursor) for key in subl]
@@ -747,6 +766,11 @@ async def sp_delete_tag(ctx, tag:str):
 async def sp_pull(ctx, shitpost_id:int=None, keyphrase:str=None, tags:str=None, choose_random:bool=False, get_details:bool=False):
     """Pulls a shitpost based on matching tags or description."""
     await ctx.defer(ephemeral=True)
+    sufficient_privileges = sp_has_permission(str(ctx.author.id), query=True) # Check if user can query
+    if not sufficient_privileges[0] and sufficient_privileges[1]:
+        await ctx.send_followup("Insufficient privileges", ephemeral=True, delete_after=10)
+        return
+
     if shitpost_id is None:
         sql_cursor.execute("SELECT id, description FROM shitposts_tbl;")
         shitpost_descriptions = dict(list(sql_cursor))
@@ -786,8 +810,8 @@ async def sp_pull(ctx, shitpost_id:int=None, keyphrase:str=None, tags:str=None, 
         shitposts_tags = list(sql_cursor)
         if tags is not None:
             tags = tags.upper()
-            tag_list = tags.split(' ')
-            for tag in tag_list:
+            tags = tags.split(' ')
+            for tag in tags:
                 if not sp_valid_tag(tag):
                     await ctx.send_followup("One or more tags contain illegal characters", ephemeral=True, delete_after=10)
                     return
@@ -831,6 +855,30 @@ async def sp_pull(ctx, shitpost_id:int=None, keyphrase:str=None, tags:str=None, 
             await sp_pull_by_id(ctx, output.pop(), get_details=get_details)
     else:
         await sp_pull_by_id(ctx, shitpost_id, get_details=get_details)
+
+@BillyBot.slash_command(name="sp_add_tags_to_shitpost")
+async def sp_add_tag_to_shitpost(ctx, shitpost_id:int, tags:str):
+    sufficient_privileges = sp_has_permission(str(ctx.author.id), submit=True)
+    if not sufficient_privileges[0]:
+        await ctx.respond(f"Insufficient permissions")
+        return
+
+    tags = tags.split(' ')
+    sp_add_shitpost_tags(shitpost_id, tags)
+    sql_connection.commit()
+    await ctx.respond(f"tags: {', '.join([f'*{tag}*' for tag in tags])} were successfully added to shitpost{shitpost_id}")
+
+@BillyBot.slash_command(name="sp_remove_tags_from_shitpost")
+async def sp_remove_tag_from_shitpost(ctx, shitpost_id:int, tags:str):
+    sufficient_privileges = sp_has_permission(str(ctx.author.id), remove=True)
+    if not sufficient_privileges[0]:
+        await ctx.respond(f"Insufficient permissions")
+        return
+
+    tags = tags.split(' ')
+    sp_remove_shitpost_tag(shitpost_id, tags)
+    sql_connection.commit()
+    await ctx.respond(f"tags: {', '.join([f'*{tag}*' for tag in tags])} were successfully removed from shitpost{shitpost_id}")
 
 @BillyBot.slash_command(name="sp_delete_shitpost")
 async def sp_delete_shitpost(ctx, id:int):
@@ -909,8 +957,7 @@ async def shitpost(ctx, src:str, tags:str, description:str):
         sql_cursor.execute(sql_insert_blob_query, insert_blob_tuple)
         shitpost_id = sql_cursor.lastrowid
 
-        for tag in tags:
-            sql_cursor.execute("INSERT INTO sp_shitposts_tags_tbl (tag_id, shitpost_id) VALUES (%s, %s);", (tag_list[tag], shitpost_id))
+        sp_add_shitpost_tags(shitpost_id, tags)
 
         with open(f"resources/dynamic/shitposts/shitpost{shitpost_id}.{media_extension}", "wb") as shitpost_file:
             shitpost_file.write(media_contents)
