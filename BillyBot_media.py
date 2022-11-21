@@ -157,6 +157,7 @@ class Media:
             def download_source(source:str):
                 resp = requests.get(source, stream=True)
                 if resp.status_code != 200:
+                    print(f"STATUS CODE {resp.status_code} ERROR IN FETCH_FILE")
                     return None
                 contents = bytes()
                 # 4MB (4194304)
