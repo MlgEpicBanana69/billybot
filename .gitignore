@@ -12,6 +12,7 @@ __pycache__/
 
 # dynamic resources
 dynamic/
+resources/
 
 # Token file
 token.txt
