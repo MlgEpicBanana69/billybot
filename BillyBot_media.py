@@ -483,12 +483,14 @@ class Player:
         """Returns the player's queue"""
         return self._queue
 
-    async def wipe(self):
+    async def wipe_and_remove(self):
         """Stops playing and wipes the player back into default settings"""
         await self.stop()
 
         self._loop = False
         self._queue = []
+
+        Player._players.remove(self)
 
     def get_bot(self):
         return self._bot

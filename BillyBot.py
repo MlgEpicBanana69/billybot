@@ -27,11 +27,24 @@ from BillyBot_osu import BillyBot_osu
 #   server managment commands
 #   the ultimate shitpost database
 
+# needs to update pycord
+
+# Couple of helpful links
+# ------------------------
 # Discord developer portal
 # https://discord.com/developers/applications/757490339425550336/information
-
+#
 # BillyBot invite url
 # https://discord.com/api/oauth2/authorize?client_id=757490339425550336&permissions=8&scope=applications.commands%20bot
+#
+# Discord API Documantation
+# https://discord.com/developers/docs/intro
+#
+# Pycord Documantation
+# https://docs.pycord.dev/en/stable/
+#
+# Autocode Embed Builder
+# https://autocode.com/tools/discord/embed-builder/
 
 load_dotenv()
 
@@ -42,7 +55,7 @@ BOT_DISCORD_FILE_LIMIT = bb_media.Media.DISCORD_FILE_LIMITERS[0]
 DISCORD_MESSAGE_SIZE_LIMITS = (2000,)
 BOT_DISCORD_MESSAGE_SIZE_LIMIT = DISCORD_MESSAGE_SIZE_LIMITS[0]
 
-# Every auto list contains a two dimension tuple containing the member id and guild id
+# Every auto list contains a two dimensional tuple containing the member id and guild id
 # (id, guild_id)
 auto_say_members = []
 
@@ -59,10 +72,6 @@ sql_cursor = sql_connection.cursor()
 @BillyBot.event
 async def on_ready():
     """Does the initial setup for BillyBot"""
-
-    # Generates and binds a player for all of the guilds
-    for guild in BillyBot.guilds:
-        bb_media.Player(guild, BillyBot)
 
     # Log and wait for bot to be online
     await BillyBot.change_presence(status=discord.Status.online)
@@ -103,7 +112,13 @@ async def on_command_error(ctx:ApplicationContext, error):
 
 @BillyBot.event
 async def on_guild_join(guild):
-    bb_media.Player(guild, BillyBot)
+    pass
+
+@BillyBot.event
+async def on_guild_remove(guild):
+    guild_player = bb_media.Player.get_player(guild)
+    if guild_player is not None:
+        await guild_player.wipe_and_remove()
 # endregion
 
 #region Simple commands
@@ -304,6 +319,8 @@ async def play(ctx:ApplicationContext, source:str=None, shitpost_id:int=None, sp
     if ctx.author.voice is not None:
         await bot_join(ctx)
         guild_player = bb_media.Player.get_player(ctx.guild)
+        if guild_player is None:
+            guild_player = bb_media.Player(ctx.guild, BillyBot)
         ultimate_source = None
 
         if source is not None:
@@ -400,6 +417,9 @@ async def bot_join(ctx:ApplicationContext, respond_on_join=False):
         await ctx.respond("You're not in any voice channel.")
         return
     elif ctx.guild.voice_client is None:
+        guild_player = bb_media.Player.get_player(ctx.guild)
+        if guild_player is not None:
+            await guild_player.wipe_and_remove()
         await ctx.author.voice.channel.connect()
     elif ctx.guild.voice_client.channel != ctx.author.voice.channel:
         await ctx.guild.me.move_to(ctx.author.voice.channel)
@@ -417,7 +437,9 @@ async def leave(ctx:ApplicationContext):
         await ctx.respond("What")
     if ctx.guild.voice_client is not None:
         await ctx.guild.voice_client.disconnect()
-        await bb_media.Player.get_player(ctx.guild).wipe()
+        guild_player = bb_media.Player.get_player(ctx.guild)
+        if guild_player is not None:
+            await guild_player.wipe_and_remove()
         await ctx.respond("Bye bye", delete_after=5)
     else:
         await ctx.respond("I'm not in a voice channel! Use /join to make me join one.")
@@ -891,7 +913,8 @@ async def sp_pull(ctx:ApplicationContext, shitpost_id:int=None, keyphrase:str=No
         else:
             for shitpost in list(output)[:choose_limit:]:
                 await sp_pull_by_id(ctx, shitpost, get_details=get_details)
-            await ctx.send_followup("Shitpost pulled succesfully.", ephemeral=True)
+            if not get_details:
+                await ctx.send_followup("Shitpost pulled succesfully.", ephemeral=True)
     else:
         await sp_pull_by_id(ctx, shitpost_id, get_details=get_details)
         await ctx.send_followup("Shitpost pulled succesfully.", ephemeral=True)
