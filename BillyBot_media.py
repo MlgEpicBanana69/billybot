@@ -12,6 +12,7 @@ import requests
 import validators
 from discord.utils import get
 from youtube_dl import YoutubeDL
+from discord.ui import Button, View
 
 mimetypes.init()
 
@@ -391,13 +392,57 @@ class Media:
 class Player:
     """BillyBot's unique player"""
 
+    EMBED_TEMPLATE = {
+        "type": "rich",
+        "title": "BillyBot PlayerEmbed",
+        "description": "Playing!",
+        "color": 16711680,
+        "fields": [
+            {
+                "name": "Currently playing:",
+                "value": "Ch3rry",
+                "inline": False
+            },
+            {
+                "name": "Playing next:",
+                "value": "Hello Marina",
+                "inline": False
+            }
+        ],
+        "thumbnail": {
+            "url": "https://cdn.discordapp.com/attachments/911384860961173575/1045384490035458129/image.png",
+            "height": 0,
+            "width": 0,
+        },
+    }
+
     _players = []  # static variable containing ALL player objects
 
-    def __init__(self, guild, bot):
+    def __init__(self, ctx, bot):
         self._players.append(self)
 
-        self._guild = guild  # The guild that the player is binded to
+        self._ctx = ctx
+        self._guild = ctx.guild # The guild that the player is binded to
         self._bot = bot
+
+        self.view = View()
+        self.compontents = {
+            # "back": Button(style=discord.ButtonStyle.primary, label="<<"),
+            "stop": Button(style=discord.ButtonStyle.danger,  label="Stop", emoji="⏹️"),
+            "resume": Button(style=discord.ButtonStyle.success, label="Resume", emoji="▶️"),
+            "pause": Button(style=discord.ButtonStyle.success, label="Pause", emoji="⏸️"),
+            "skip": Button(style=discord.ButtonStyle.primary, label=">>"),
+            "loop": Button(style=discord.ButtonStyle.secondary, label="Loop", emoji="🔂"),
+            "shuffle": Button(style=discord.ButtonStyle.secondary, label="Shuffle", emoji="🔀"),
+        }
+        #self.compontents["back"] =
+        self.compontents["stop"].callback = self.stop
+        self.compontents["resume"].callback = self.resume
+        self.compontents["pause"].callback = self.pause
+        self.compontents["skip"].callback = self.next
+        self.compontents["loop"].callback = self.toggle_loop
+        self.compontents["shuffle"].callback = self.shuffle
+        [self.view.add_item(val) for val in self.compontents.values()]
 
         self._loop = False # Is the player in loop state
         self._queue = [] # The queue of songs in order
@@ -431,7 +476,7 @@ class Player:
 
             if len(self.get_queue()) > 0:
                 next_song = self.get_queue()[0]
-                print("Playing {0} on guild {1}".format(next_song.get_name(), self.get_guild().name))
+                print("Playing {0} on guild {1}".format(next_song.get_name(), self._guild.name))
                 strm = next_song.get_stream()
                 voice.play(strm, after=lambda e: self.next())
 
@@ -468,14 +513,14 @@ class Player:
         """Resumes to playing the queue"""
         get(self._bot.voice_clients, guild=self._guild).resume()
 
-    def get_guild(self):
-        """Returns the guild this player is attached to"""
-        return self._guild
+    def get_ctx(self):
+        """Gets the ctx the player is binded to"""
+        return self._ctx
 
     @staticmethod
-    def get_player(guild):
+    def get_player(ctx):
         for player in Player._players:
-            if player.get_guild() == guild:
+            if player.get_ctx() == ctx:
                 return player
         return None
 
@@ -483,12 +528,26 @@ class Player:
         """Returns the player's queue"""
         return self._queue
 
-    async def wipe(self):
+    async def wipe_and_remove(self):
         """Stops playing and wipes the player back into default settings"""
         await self.stop()
 
         self._loop = False
         self._queue = []
 
+        Player._players.remove(self)
+
     def get_bot(self):
         return self._bot
+
+    def make_embed(self) -> discord.Embed:
+        output_embed = Player.EMBED_TEMPLATE.copy()
+
+        return discord.Embed.from_dict(output_embed)
+
+    def update_queue(self, new_queue):
+        pass
+
+    async def run(self):
+        await self._ctx.respond("", embed=self.make_embed(), view=self.view)
+        self.view

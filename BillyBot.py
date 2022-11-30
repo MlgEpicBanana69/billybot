@@ -7,7 +7,6 @@ import random
 import cv2
 import datetime
 import discord
-from discord.commands.context import ApplicationContext
 import mysql.connector
 import numpy as np
 import requests
@@ -27,11 +26,19 @@ from BillyBot_osu import BillyBot_osu
 #   server managment commands
 #   the ultimate shitpost database
 
+# needs to update pycord
+
 # Discord developer portal
 # https://discord.com/developers/applications/757490339425550336/information
-
+#
 # BillyBot invite url
 # https://discord.com/api/oauth2/authorize?client_id=757490339425550336&permissions=8&scope=applications.commands%20bot
+#
+# Discord API Documantaion
+# https://discord.com/developers/docs/intro
+#
+# Autocode Embed Builder
+# https://autocode.com/tools/discord/embed-builder/
 
 load_dotenv()
 
@@ -59,10 +66,6 @@ sql_cursor = sql_connection.cursor()
 @BillyBot.event
 async def on_ready():
     """Does the initial setup for BillyBot"""
-
-    # Generates and binds a player for all of the guilds
-    for guild in BillyBot.guilds:
-        bb_media.Player(guild, BillyBot)
 
     # Log and wait for bot to be online
     await BillyBot.change_presence(status=discord.Status.online)
@@ -92,7 +95,7 @@ async def on_message(message):
                         break
 
 @BillyBot.event
-async def on_command_error(ctx:ApplicationContext, error):
+async def on_command_error(ctx, error):
     await ctx.defer()
     match error:
         case isinstance(error, commands.errors.MissingPermissions):
@@ -100,25 +103,21 @@ async def on_command_error(ctx:ApplicationContext, error):
         case _:
             await ctx.respond("Command failed to to unknown error")
             raise
-
-@BillyBot.event
-async def on_guild_join(guild):
-    bb_media.Player(guild, BillyBot)
 # endregion
 
 #region Simple commands
 @BillyBot.slash_command(name="ping")
-async def ping(ctx:ApplicationContext):
+async def ping(ctx):
     """Checks that the bot is online"""
     await ctx.respond("pong! :ping_pong:")
 
 @BillyBot.slash_command(name="say")
-async def say(ctx:ApplicationContext, message):
+async def say(ctx, message):
     """Repeats a given message."""
     await ctx.respond(message)
 
 @BillyBot.slash_command(name="roll")
-async def roll(ctx:ApplicationContext, end:int=100, start:int=1):
+async def roll(ctx, end:int=100, start:int=1):
     """ Rolls a number in the given range where both ends are inclusive """
 
     if start > end:
@@ -127,7 +126,7 @@ async def roll(ctx:ApplicationContext, end:int=100, start:int=1):
         await ctx.respond("I rolled: {0}!".format(random.randint(start, end)))
 
 @BillyBot.slash_command(name="squaretext")
-async def squaretext(ctx:ApplicationContext, message):
+async def squaretext(ctx, message):
     """why (Squares text)"""
 
     final_message = ""
@@ -168,7 +167,7 @@ async def squaretext(ctx:ApplicationContext, message):
         await ctx.respond(content="", file=discord.File(fp=io.StringIO(final_message), filename="squared_text.txt"))
 
 @BillyBot.slash_command(name="doomsday")
-async def doomsday(ctx:ApplicationContext, day: int, month: int, year: int):
+async def doomsday(ctx, day: int, month: int, year: int):
     """Tells you what day a given date is using the doomsday algorithm"""
     await ctx.defer()
     days_of_the_week = ["Sunday", "Monday", "Tuesday",
@@ -200,7 +199,7 @@ async def doomsday(ctx:ApplicationContext, day: int, month: int, year: int):
     await ctx.respond(f"{day}/{month}/{year} is a {days_of_the_week[output]}")
 
 @BillyBot.slash_command(name="dolev")
-async def dolev(ctx:ApplicationContext, equation):
+async def dolev(ctx, equation):
     if equation.count("=") == 1:
         await ctx.defer()
         await asyncio.sleep(120)
@@ -209,14 +208,14 @@ async def dolev(ctx:ApplicationContext, equation):
         await ctx.respond("This is not a valid equation.")
 
 @BillyBot.slash_command(name="bibi")
-async def bibi(ctx:ApplicationContext):
+async def bibi(ctx):
     """Sends a picture of Israel's **EX** prime minister Benjamin Netanyahu."""
     bb_images = os.listdir("resources\\static\\bibi\\")
     with open("resources\\static\\bibi\\" + random.choice(bb_images), "rb") as bb_pick:
         await ctx.respond(file=discord.File(fp=bb_pick, filename="bb.png"))
 
 @BillyBot.slash_command(name="ofekganor")
-async def ofekganor(ctx:ApplicationContext):
+async def ofekganor(ctx):
     """Sends a picture of Lord Ofek Ganor in his full glory"""
     await ctx.defer()
     ofek_images = os.listdir("resources\\static\\ofekganor\\")
@@ -224,7 +223,7 @@ async def ofekganor(ctx:ApplicationContext):
         await ctx.respond(file=discord.File(fp=ofek_pick, filename="ofek.png"))
 
 @BillyBot.slash_command(name="aranara")
-async def aranara(ctx:ApplicationContext):
+async def aranara(ctx):
     """Sends a picture of an aranara"""
     aranara_images = os.listdir("resources\\static\\aranara\\")
     aranara_choice_name = random.choice(aranara_images)
@@ -232,7 +231,7 @@ async def aranara(ctx:ApplicationContext):
         await ctx.respond(file=discord.File(fp=aranara_pick, filename=aranara_choice_name))
 
 @BillyBot.slash_command(name="fetch_file")
-async def fetch_file(ctx:ApplicationContext, src:str, force_audio_only:bool=False):
+async def fetch_file(ctx, src:str, force_audio_only:bool=False):
     await ctx.defer()
     media = bb_media.Media(src, force_audio_only=force_audio_only)
     try:
@@ -245,7 +244,7 @@ async def fetch_file(ctx:ApplicationContext, src:str, force_audio_only:bool=Fals
         await ctx.respond("Error fetching file...")
 
 @BillyBot.slash_command(name="weekly_torah_portion")
-async def weekly_torah_portion(ctx:ApplicationContext):
+async def weekly_torah_portion(ctx):
     resp = requests.get("https://www.פרשת-שבוע.com")
     soup = BeautifulSoup(resp.text, 'html.parser')
     href = resp.text.split("post-title entry-title")[1].split("href=")[1].split(">")[0][1:-1:]
@@ -256,7 +255,7 @@ async def weekly_torah_portion(ctx:ApplicationContext):
 
 #region Chat toggles
 @BillyBot.slash_command(name="saytoggle")
-async def saytoggle(ctx:ApplicationContext):
+async def saytoggle(ctx):
     """Toggles on/off the auto echo function."""
 
     if (ctx.author.id, ctx.guild.id) not in auto_say_members:
@@ -270,7 +269,7 @@ async def saytoggle(ctx:ApplicationContext):
 #region Server managment commands
 @BillyBot.slash_command(name="purge")
 @commands.has_permissions(manage_messages=True)
-async def purge(ctx:ApplicationContext, n:int=None, before:str=None):
+async def purge(ctx, n:int=None, before:str=None):
     """Deletes n meesages from the current text channel"""
     await ctx.defer()
     if n is not None:
@@ -293,7 +292,7 @@ async def purge(ctx:ApplicationContext, n:int=None, before:str=None):
 
 #region Player commands
 @BillyBot.slash_command(name="play")
-async def play(ctx:ApplicationContext, source:str=None, shitpost_id:int=None, speed:float=1.0):
+async def play(ctx, source:str=None, shitpost_id:int=None, speed:float=1.0):
     """Plays audio from an audio source
 
     # Playing a 'source' goes by these rules:
@@ -303,7 +302,10 @@ async def play(ctx:ApplicationContext, source:str=None, shitpost_id:int=None, sp
     await ctx.defer()
     if ctx.author.voice is not None:
         await bot_join(ctx)
-        guild_player = bb_media.Player.get_player(ctx.guild)
+        guild_player = bb_media.Player.get_player(ctx)
+        if guild_player is None:
+            guild_player = bb_media.Player(ctx, BillyBot)
+            await guild_player.run()
         ultimate_source = None
 
         if source is not None:
@@ -327,44 +329,44 @@ async def play(ctx:ApplicationContext, source:str=None, shitpost_id:int=None, sp
 
         media = bb_media.Media(ultimate_source, force_audio_only=True, speed=speed)
         await guild_player.play(media)
-        await ctx.respond(f"{media.get_name()} added to queue!")
+        # await ctx.respond(f"{media.get_name()} added to queue!")
     else:
         await ctx.respond("You're not in any voice channel.")
 
 @BillyBot.slash_command(name="stop")
-async def stop(ctx:ApplicationContext):
+async def stop(ctx):
     """Stops the music and clears the queue"""
     await bb_media.Player.get_player(ctx.guild).stop()
     await ctx.respond("Player stopped.")
 
 @BillyBot.slash_command(name="pause")
-async def pause(ctx:ApplicationContext):
+async def pause(ctx):
     """Pauses the current song"""
     if ctx.guild.me.voice.channel == ctx.author.voice.channel and ctx.guild.me.voice is not None:
         await ctx.respond("Now paused.")
         await bb_media.Player.get_player(ctx.guild).pause()
 
 @BillyBot.slash_command(name="resume")
-async def resume(ctx:ApplicationContext):
+async def resume(ctx):
     """Pauses the current song"""
     if ctx.guild.me.voice.channel == ctx.author.voice.channel and ctx.guild.me.voice is not None:
         await ctx.respond("Resumed.")
         await bb_media.Player.get_player(ctx.guild).resume()
 
 @BillyBot.slash_command(name="skip")
-async def skip(ctx:ApplicationContext):
+async def skip(ctx):
     """Skips to the next song in queue"""
     await ctx.respond("Skipped")
     guild_player = bb_media.Player.get_player(ctx.guild)
     guild_player.next()
 
 @BillyBot.slash_command(name="shuffle")
-async def shuffle(ctx:ApplicationContext):
+async def shuffle(ctx):
     """Shuffles the queue"""
     await bb_media.Player.get_player(ctx.guild).shuffle()
 
 @BillyBot.slash_command(name="loop")
-async def loop(ctx:ApplicationContext):
+async def loop(ctx):
     """Toggles playlist loop on/off"""
     await ctx.defer()
     loop_state = bb_media.Player.get_player(ctx.guild).toggle_loop()
@@ -372,30 +374,31 @@ async def loop(ctx:ApplicationContext):
     await ctx.respond("Loop is now {0}".format(loop_state))
 
 @BillyBot.slash_command(name="skipto")
-async def skipto(ctx:ApplicationContext, position: int):
+async def skipto(ctx, position: int):
     """Skips to a position in queue"""
     await bb_media.Player.get_player(ctx.guild).goto(position)
 
 @BillyBot.slash_command(name="queue")
-async def queue(ctx:ApplicationContext):
+async def queue(ctx):
     """Displays the current queue"""
     guild_player = bb_media.Player.get_player(ctx.guild)
-    queue_string = "\n".join([f"{i+1}. " + media.get_name()
-                             for i, media in enumerate(guild_player.get_queue())])
-    if queue_string != "":
-        await ctx.respond(queue_string)
-    else:
-        await ctx.respond("I am not playing anything right now!")
+    if guild_player is not None:
+        queue_string = "\n".join([f"{i+1}. " + media.get_name()
+                                for i, media in enumerate(guild_player.get_queue())])
+        if queue_string != "":
+            await ctx.respond(queue_string)
+            return
+    await ctx.respond("I am not playing anything right now!")
 # endregion
 
 #region Voice commands
 @BillyBot.slash_command(name="join")
-async def join(ctx:ApplicationContext):
+async def join(ctx):
     """Joins into your voice channel."""
     await ctx.defer()
     await bot_join(ctx, True)
 
-async def bot_join(ctx:ApplicationContext, respond_on_join=False):
+async def bot_join(ctx, respond_on_join=False):
     if ctx.author.voice is None:
         await ctx.respond("You're not in any voice channel.")
         return
@@ -403,6 +406,7 @@ async def bot_join(ctx:ApplicationContext, respond_on_join=False):
         await ctx.author.voice.channel.connect()
     elif ctx.guild.voice_client.channel != ctx.author.voice.channel:
         await ctx.guild.me.move_to(ctx.author.voice.channel)
+
     try:
         await ctx.guild.me.edit(deafen=True)
     except discord.errors.Forbidden:
@@ -411,13 +415,13 @@ async def bot_join(ctx:ApplicationContext, respond_on_join=False):
         await ctx.respond("Joined your VC", delete_after=5)
 
 @BillyBot.slash_command(name="leave")
-async def leave(ctx:ApplicationContext):
+async def leave(ctx):
     """Leaves voice channel."""
     if ctx.guild is None:
         await ctx.respond("What")
     if ctx.guild.voice_client is not None:
         await ctx.guild.voice_client.disconnect()
-        await bb_media.Player.get_player(ctx.guild).wipe()
+        await bb_media.Player.get_player(ctx.guild).wipe_and_remove()
         await ctx.respond("Bye bye", delete_after=5)
     else:
         await ctx.respond("I'm not in a voice channel! Use /join to make me join one.")
@@ -425,7 +429,7 @@ async def leave(ctx:ApplicationContext):
 
 #region Processing commands
 @BillyBot.slash_command(name="cyber")
-async def cyber(ctx:ApplicationContext, args=""):
+async def cyber(ctx, args=""):
     """Overlays the text סייבר on a given image."""
 
     await ctx.defer()
@@ -482,7 +486,7 @@ async def cyber(ctx:ApplicationContext, args=""):
 
 #region Personal management
 @BillyBot.slash_command(name="remindme")
-async def remindme(ctx:ApplicationContext, reminder, seconds:int=0, minutes:int=0, hours:int=0, days:int=0, weeks:int=0, years:int=0):
+async def remindme(ctx, reminder, seconds:int=0, minutes:int=0, hours:int=0, days:int=0, weeks:int=0, years:int=0):
     """Will remind you in <t> time
        years are defined as 365 days"""
     time = 60*(60*(24*(years*365 + weeks*7 + days) + hours) + minutes) + seconds
@@ -494,7 +498,7 @@ async def remindme(ctx:ApplicationContext, reminder, seconds:int=0, minutes:int=
 
 #region gaming
 @BillyBot.slash_command(name="minesweeper")
-async def minesweeper(ctx:ApplicationContext, width: int, height: int, mines: int):
+async def minesweeper(ctx, width: int, height: int, mines: int):
     """Play minesweeper, powered by BillyBot™"""
 
     # Criterias for a valid game
@@ -526,19 +530,19 @@ async def minesweeper(ctx:ApplicationContext, width: int, height: int, mines: in
 
 #region Tag user commands
 @BillyBot.user_command(name="sus")
-async def sus(ctx:ApplicationContext, user):
+async def sus(ctx, user):
     """amogus"""
     await ctx.respond(f"{ctx.author.mention} susses out {user.mention}")
 
 @BillyBot.user_command(name="love")
-async def love(ctx:ApplicationContext, user):
+async def love(ctx, user):
     """Tag someone you like"""
     await ctx.respond(f"{ctx.author.mention} ❤️ {user.mention} 🥰")
 # endregion
 
 #region osu commands
 @BillyBot.slash_command(name="mergecollections")
-async def merge_collections(ctx:ApplicationContext, collections):
+async def merge_collections(ctx, collections):
     """Merges the given osu collection.db files together"""
     await ctx.defer()
     collections = [bb_media.Media(collection).fetch_file() for collection in collections.split()]
@@ -547,7 +551,7 @@ async def merge_collections(ctx:ApplicationContext, collections):
     await ctx.respond(f"Merged {len(collections)} collections", file=discord.File(fp=io.BytesIO(file_contents), filename="collection.db"))
 
 @BillyBot.slash_command(name="glorydays")
-async def glory_days(ctx:ApplicationContext, language:str="en"):
+async def glory_days(ctx, language:str="en"):
     copypastas = {
                     "en": "To seek the Glory Days 🌅 We’ll fight the lion’s way 🦁 Then let the rain wash 🌧 All of our pride away 😇 So if this victory 🏆 Is our last odyssey 🚗 Then let the POWER within us decide! 💪",
                     "he": "לחפש אחרי ימי התהילה 🌅 נלחם בדרך האריה 🦁 ואז נתן לגשם לשטוף 🌧️ את כל גאוותנו 😇 אז אם הניצחון הזה 🏆 הוא המסע הקשה האחרון שלנו 🚗 אז תן לכוח שבתוכנו להחליט 💪",
@@ -630,7 +634,7 @@ def sp_shitpost_tags(shitpost_id:int) -> list:
     sql_cursor.execute("SELECT sp_tags_tbl.tag FROM sp_shitposts_tags_tbl INNER JOIN sp_tags_tbl ON sp_tags_tbl.id = sp_shitposts_tags_tbl.tag_id WHERE shitpost_id = %s", (shitpost_id,))
     return [item for sublist in sql_cursor for item in sublist]
 
-async def sp_pull_by_id(ctx:ApplicationContext, id:int, *, get_details:bool=False):
+async def sp_pull_by_id(ctx, id:int, get_details:bool=False):
     """Pulls a shitpost by its ID"""
     output_msg = ""
     sql_cursor.execute("SELECT * FROM shitposts_tbl WHERE id=%s", (id,))
@@ -655,11 +659,12 @@ async def sp_pull_by_id(ctx:ApplicationContext, id:int, *, get_details:bool=Fals
         await ctx.send_followup(output_msg)
     else:
         await ctx.channel.send("", file=discord.File(fp=shitpost_file, filename=f"shitpost{id}.{shitpost_file_ext}"))
+        await ctx.send_followup("Shitpost pulled succesfully.", ephemeral=True)
 
     shitpost_file.close()
 
 @BillyBot.slash_command(name="sp_modify_user")
-async def sp_modify_user(ctx:ApplicationContext, discord_user:str, privilege_name:str):
+async def sp_modify_user(ctx, discord_user:str, privilege_name:str):
     """
     Modifies the privilege of a given discord user.
     If the user is not in the database, adds it to the database with the given privilege
@@ -693,7 +698,7 @@ async def sp_modify_user(ctx:ApplicationContext, discord_user:str, privilege_nam
     await ctx.respond("Completed action")
 
 @BillyBot.slash_command(name="sp_rate")
-async def sp_rate(ctx:ApplicationContext, shitpost_id:int, rating:int):
+async def sp_rate(ctx, shitpost_id:int, rating:int):
     submitter_id = str(ctx.author.id)
     if not sp_has_permission(submitter_id, rate=True)[0]:
         await ctx.respond("Insufficient permissions.")
@@ -716,7 +721,7 @@ async def sp_rate(ctx:ApplicationContext, shitpost_id:int, rating:int):
     await ctx.respond(reply)
 
 @BillyBot.slash_command(name="sp_list_tags")
-async def sp_list_tags(ctx:ApplicationContext, contains:str="", startswith:str=""):
+async def sp_list_tags(ctx, contains:str="", startswith:str=""):
     """Sends a list of legal tags that contains the given string"""
     await ctx.defer(ephemeral=True)
     author_has_permission = sp_has_permission(str(ctx.author.id), query=True)
@@ -724,20 +729,16 @@ async def sp_list_tags(ctx:ApplicationContext, contains:str="", startswith:str="
 
     contains = contains.upper()
     startswith = startswith.upper()
-    sql_cursor.execute("SELECT tag, COUNT(tag) FROM sp_shitposts_tags_view GROUP BY tag ORDER BY tag;")
+    sql_cursor.execute("SELECT tag FROM sp_tags_tbl")
     # NOTE: Try using fetchall
-    query = list(sql_cursor)
-    tag_list = "\n".join([f"{tag} ({count})" for tag, count in dict(query).items() if (contains in tag) and (tag.startswith(startswith))])
+    tag_list = "\n".join([tag for subl in list(sql_cursor) for tag in subl if (contains in tag) and (tag.startswith(startswith))])
     if len(tag_list) > 0:
-        if len(tag_list) <= BOT_DISCORD_MESSAGE_SIZE_LIMIT:
-            await ctx.send_followup(tag_list, ephemeral=True)
-        else:
-            await ctx.send_followup("", file=discord.File(fp=io.StringIO(tag_list), filename="tags.txt"), ephemeral=True)
+        await ctx.send_followup(tag_list, ephemeral=True)
     else:
         await ctx.send_followup("No tags were found using the given filter.", ephemeral=True)
 
 @BillyBot.slash_command(name="sp_add_tag")
-async def sp_add_tag(ctx:ApplicationContext, tag:str):
+async def sp_add_tag(ctx, tag:str):
     """Adds a tag to the legal list of tags. Please use resposibly."""
     if not sp_has_permission(str(ctx.author.id), submit=True)[0]:
         await ctx.respond("Insufficient privileges")
@@ -756,7 +757,7 @@ async def sp_add_tag(ctx:ApplicationContext, tag:str):
         await ctx.respond(f"Failed to add *{tag}* to database, tag already exists!")
 
 @BillyBot.slash_command(name="sp_delete_tag")
-async def sp_delete_tag(ctx:ApplicationContext, tag:str):
+async def sp_delete_tag(ctx, tag:str):
     await ctx.defer()
     if not sp_has_permission(str(ctx.author.id), remove=True)[0]:
         await ctx.respond("Insufficient user privilege")
@@ -772,33 +773,8 @@ async def sp_delete_tag(ctx:ApplicationContext, tag:str):
     await ctx.respond(f"Deleted tag *{tag}*")
 
 @BillyBot.slash_command(name="sp_pull")
-async def sp_pull(ctx:ApplicationContext, shitpost_id:int=None, keyphrase:str=None, tags:str=None, choose_limit:int=1, choose_random:bool=False, get_details:bool=False):
-    """
-    Pulls one or more shitposts based on matching tags or description and sends it in ctx
-
-    Parameters
-    ----------
-    ctx : ApplicationContext
-        Discord context
-    shitpost_id : int
-        Filter shitposts by id. Can only match one or more shitposts.
-    keyphrase : str
-        Filter shitposts by a keyphrase. This argument is used to match shitposts
-        off their description value.
-    tags : str
-        A string of tags each seperated by a space. Filters shitposts to require *all* of the tags given
-    choose_limit : int
-        Sets the limit of how many shitposts are allowed to be pulled.
-        If there are more matches than the limit allows this function responds with an
-        ephemeral list of all matches found without sending the media files themselves.
-        If this argument is set to 0, this function will not enforce any limit
-    choose_random : bool
-        Out of all matches found, only send one shitpost at random.
-    get_details : bool
-        Option to only get the metadata of the shitpost rather than the media file itself.
-        When set to true, this function will not send the media file of matched shitpost/s
-    """
-
+async def sp_pull(ctx, shitpost_id:int=None, keyphrase:str=None, tags:str=None, choose_random:bool=False, get_details:bool=False):
+    """Pulls a shitpost based on matching tags or description."""
     await ctx.defer(ephemeral=True)
     sufficient_privileges = sp_has_permission(str(ctx.author.id), query=True) # Check if user can query
     if not sufficient_privileges[0] and sufficient_privileges[1]:
@@ -877,10 +853,7 @@ async def sp_pull(ctx:ApplicationContext, shitpost_id:int=None, keyphrase:str=No
         if choose_random:
             output = random.sample(output, 1)
 
-        if choose_limit == 0:
-            choose_limit = len(output)
-
-        if len(output) > choose_limit:
+        if len(output) > 1:
             output_message = []
             for sp_id, sp_desc in shitpost_descriptions.items():
                 if sp_id in output:
@@ -888,16 +861,13 @@ async def sp_pull(ctx:ApplicationContext, shitpost_id:int=None, keyphrase:str=No
             output_message = sorted(output_message, key=lambda x: x[0])
             output_message = "\n".join([part for _, part in output_message])
             await ctx.send_followup(output_message[:2000-8] + "\n**...**", ephemeral=True)
-        else:
-            for shitpost in list(output)[:choose_limit:]:
-                await sp_pull_by_id(ctx, shitpost, get_details=get_details)
-            await ctx.send_followup("Shitpost pulled succesfully.", ephemeral=True)
+        elif len(output) == 1:
+            await sp_pull_by_id(ctx, output.pop(), get_details=get_details)
     else:
         await sp_pull_by_id(ctx, shitpost_id, get_details=get_details)
-        await ctx.send_followup("Shitpost pulled succesfully.", ephemeral=True)
 
 @BillyBot.slash_command(name="sp_add_tags_to_shitpost")
-async def sp_add_tag_to_shitpost(ctx:ApplicationContext, shitpost_id:int, tags:str):
+async def sp_add_tag_to_shitpost(ctx, shitpost_id:int, tags:str):
     sufficient_privileges = sp_has_permission(str(ctx.author.id), submit=True)
     if not sufficient_privileges[0]:
         await ctx.respond(f"Insufficient permissions")
@@ -909,7 +879,7 @@ async def sp_add_tag_to_shitpost(ctx:ApplicationContext, shitpost_id:int, tags:s
     await ctx.respond(f"tags: {', '.join([f'*{tag}*' for tag in tags])} were successfully added to shitpost{shitpost_id}")
 
 @BillyBot.slash_command(name="sp_remove_tags_from_shitpost")
-async def sp_remove_tag_from_shitpost(ctx:ApplicationContext, shitpost_id:int, tags:str):
+async def sp_remove_tag_from_shitpost(ctx, shitpost_id:int, tags:str):
     sufficient_privileges = sp_has_permission(str(ctx.author.id), remove=True)
     if not sufficient_privileges[0]:
         await ctx.respond(f"Insufficient permissions")
@@ -921,7 +891,7 @@ async def sp_remove_tag_from_shitpost(ctx:ApplicationContext, shitpost_id:int, t
     await ctx.respond(f"tags: {', '.join([f'*{tag}*' for tag in tags])} were successfully removed from shitpost{shitpost_id}")
 
 @BillyBot.slash_command(name="sp_delete_shitpost")
-async def sp_delete_shitpost(ctx:ApplicationContext, id:int):
+async def sp_delete_shitpost(ctx, id:int):
     await ctx.defer()
     if not sp_has_permission(str(ctx.author.id), remove=True)[0]:
         await ctx.respond("Insufficient user privilege")
@@ -940,7 +910,7 @@ async def sp_delete_shitpost(ctx:ApplicationContext, id:int):
     await ctx.respond(f"Deleted shitpost {id}")
 
 @BillyBot.slash_command(name="shitpost")
-async def shitpost(ctx:ApplicationContext, src:str, tags:str, description:str):
+async def shitpost(ctx, src:str, tags:str, description:str):
     """
     Uploads a shitpost into the database.
     Requires submit privilege
