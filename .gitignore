@@ -10,9 +10,10 @@ __pycache__/
 *~
 *.swp
 
-# dynamic resources
+# resources
 dynamic/
 resources/
+resources
 
 # Token file
 token.txt
