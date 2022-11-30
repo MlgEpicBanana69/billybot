@@ -87,7 +87,8 @@ class Media:
                         'noplaylist': True,
                         'youtube_include_dash_manifest': False}
         else:
-            ydl_options = {}
+            ydl_options = {'noplaylist': True,
+                        'youtube_include_dash_manifest': False}
             #ydl_options = {'format': 'bestvideo+bestaudio/bestaudio/bestvideo[ext=gif]/best',
             #            'noplaylist':'True',
             #            'youtube_include_dash_manifest': False}

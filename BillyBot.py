@@ -569,6 +569,9 @@ async def merge_collections(ctx:ApplicationContext, collections):
     await ctx.respond(f"Merged {len(collections)} collections", file=discord.File(fp=io.BytesIO(file_contents), filename="collection.db"))
 
 @BillyBot.slash_command(name="glorydays")
+@discord.option(name="language",
+                type=str,
+                choices=["en", "he", "sp", "jp", "ru", "ge", "du"])
 async def glory_days(ctx:ApplicationContext, language:str="en"):
     copypastas = {
                     "en": "To seek the Glory Days 🌅 We’ll fight the lion’s way 🦁 Then let the rain wash 🌧 All of our pride away 😇 So if this victory 🏆 Is our last odyssey 🚗 Then let the POWER within us decide! 💪",
@@ -644,9 +647,15 @@ def sp_valid_description(description:str) -> bool:
             return False
     return True
 
-def sp_rating_avg(shitpost_id:int) -> float:
+def sp_rating_avg(shitpost_id:int) -> int:
+    """Returns the average rating of a shitpost.
+    If the shitpost is not rated, returns None"""
     sql_cursor.execute("SELECT AVG(rating) as avg_rating from sp_rating_tbl where shitpost_id=%s group by shitpost_id", (shitpost_id,))
-    return float(list(sql_cursor)[0][0])
+    result = list(sql_cursor)
+    if result:
+        return round(result[0][0])
+    else:
+        return None
 
 def sp_shitpost_tags(shitpost_id:int) -> list:
     sql_cursor.execute("SELECT sp_tags_tbl.tag FROM sp_shitposts_tags_tbl INNER JOIN sp_tags_tbl ON sp_tags_tbl.id = sp_shitposts_tags_tbl.tag_id WHERE shitpost_id = %s", (shitpost_id,))
@@ -668,13 +677,14 @@ async def sp_pull_by_id(ctx:ApplicationContext, id:int, *, get_details:bool=Fals
     shitpost_file = open(f"resources/dynamic/shitposts/shitpost{id}.{shitpost_file_ext}", "rb")
 
     if get_details:
-        shitpost = dict(zip(("id", "submitter", "description"), shitpost))
+        shitpost = dict(zip(("id", "submitter", "description", "upload date"), shitpost))
         shitpost["submitter"] = await BillyBot.fetch_user(int(shitpost["submitter"]))
+        shitpost["rating"] = sp_rating_avg(shitpost["id"])
         for key, value in shitpost.items():
             output_msg += f"{key}: {value}\n"
         output_msg += f"tags: {' '.join(sp_shitpost_tags(id))}\n"
         output_msg += f"hash: {shitpost_file_hash}"
-        await ctx.send_followup(output_msg)
+        await ctx.send_followup(output_msg, ephemeral=True)
     else:
         await ctx.channel.send("", file=discord.File(fp=shitpost_file, filename=f"shitpost{id}.{shitpost_file_ext}"))
 
@@ -746,7 +756,14 @@ async def sp_list_tags(ctx:ApplicationContext, contains:str="", startswith:str="
 
     contains = contains.upper()
     startswith = startswith.upper()
-    sql_cursor.execute("SELECT tag, COUNT(tag) FROM sp_shitposts_tags_view GROUP BY tag ORDER BY tag;")
+    # Returns table with every existing tag with the amount of times they tag a shitpost
+    sql_query = """SELECT tag, CAST(SUM(NOT(ISNULL(shitpost_id))) AS UNSIGNED)
+                FROM (select tag, id from sp_tags_tbl)
+                AS epic LEFT JOIN sp_shitposts_tags_tbl
+                ON sp_shitposts_tags_tbl.tag_id = id
+                GROUP BY tag
+                ORDER BY tag;"""
+    sql_cursor.execute(sql_query)
     # NOTE: Try using fetchall
     query = list(sql_cursor)
     tag_list = "\n".join([f"{tag} ({count})" for tag, count in dict(query).items() if (contains in tag) and (tag.startswith(startswith))])
@@ -794,7 +811,9 @@ async def sp_delete_tag(ctx:ApplicationContext, tag:str):
     await ctx.respond(f"Deleted tag *{tag}*")
 
 @BillyBot.slash_command(name="sp_pull")
-async def sp_pull(ctx:ApplicationContext, shitpost_id:int=None, keyphrase:str=None, tags:str=None, choose_limit:int=1, choose_random:bool=False, get_details:bool=False):
+async def sp_pull(ctx:ApplicationContext, shitpost_id:int=None, keyphrase:str=None, tags:str=None,
+        minimum_rating:int=0, maximum_rating:int=100, allow_unrated:bool=True,
+        choose_limit:int=1, choose_random:bool=False, get_details:bool=False):
     """
     Pulls one or more shitposts based on matching tags or description and sends it in ctx
 
@@ -809,6 +828,12 @@ async def sp_pull(ctx:ApplicationContext, shitpost_id:int=None, keyphrase:str=No
         off their description value.
     tags : str
         A string of tags each seperated by a space. Filters shitposts to require *all* of the tags given
+    minimum_rating : int
+        the minimum shitpost rating allowed by the filter, inclusive.
+    maximum_rating : int
+        the maximum shitpost rating allowed by the filter, inclusive.
+    allow_unrated : bool
+        allows shitposts without a rating to bypass the rating filters.
     choose_limit : int
         Sets the limit of how many shitposts are allowed to be pulled.
         If there are more matches than the limit allows this function responds with an
@@ -830,6 +855,13 @@ async def sp_pull(ctx:ApplicationContext, shitpost_id:int=None, keyphrase:str=No
     if shitpost_id is None:
         sql_cursor.execute("SELECT id, description FROM shitposts_tbl;")
         shitpost_descriptions = dict(list(sql_cursor))
+        shitpost_descriptions_filter = filter(lambda sp:
+                                        sp_rating_avg(sp) >= minimum_rating and sp_rating_avg(sp) <= maximum_rating
+                                        if sp_rating_avg(sp) is not None
+                                        else allow_unrated,
+                                        shitpost_descriptions)
+
+        shitpost_descriptions = {key: shitpost_descriptions[key] for key in shitpost_descriptions_filter}
 
         def format_description(desc):
             output = ""
@@ -1012,10 +1044,11 @@ async def shitpost(ctx:ApplicationContext, src:str, tags:str, description:str):
         await ctx.respond("Illegal file extension")
         return
     sql_insert_blob_query = """INSERT INTO shitposts_tbl
-                          (file_hash, file_extension_id, submitter_id, description) VALUES (%s,%s,%s,%s);"""
+                          (file_hash, file_extension_id, submitter_id, description, upload_datetime) VALUES (%s,%s,%s,%s,%s);"""
     media_contents = media.get_content()
     media_hash = hashlib.sha256(media_contents).hexdigest()
-    insert_blob_tuple = (media_hash, legal_file_extensions[media_extension], ctx.author.id, description)
+    upload_datetime = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    insert_blob_tuple = (media_hash, legal_file_extensions[media_extension], ctx.author.id, description, upload_datetime)
     try:
         sql_cursor.execute(sql_insert_blob_query, insert_blob_tuple)
         shitpost_id = sql_cursor.lastrowid
