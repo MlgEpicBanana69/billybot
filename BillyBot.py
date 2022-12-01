@@ -319,8 +319,11 @@ async def play(ctx:ApplicationContext, source:str=None, shitpost_id:int=None, sp
     if ctx.author.voice is not None:
         await bot_join(ctx)
         guild_player = bb_media.Player.get_player(ctx.guild)
+        binded_player = False
         if guild_player is None:
+            binded_player = True
             guild_player = bb_media.Player(ctx.guild, BillyBot)
+            await ctx.respond("", embed=guild_player.make_embed())
         ultimate_source = None
 
         if source is not None:
@@ -330,12 +333,38 @@ async def play(ctx:ApplicationContext, source:str=None, shitpost_id:int=None, sp
             # Source is youtube query
             else:
                 results = bb_media.Media.query_youtube(source)
-                await ctx.channel.send("\n".join([entry[1] for entry in results]))
 
-                # TODO: Reactive video choosing
-                chosen_result = results[0]
+                class MyView(discord.ui.View):
+                    @discord.ui.select(
+                        placeholder = "Choose a result",
+                        min_values = 1,
+                        max_values = 1,
+                        options = [discord.SelectOption(label=result[1], value=str(i), default=i==0) for i, result in enumerate(results)]
+                    )
+                    async def select_callback(self, select, interaction:discord.interactions.Interaction): # the function called when the user is done selecting options
+                        index = int(select)
+                        await interaction.response.edit_message(content=f"{results[index][1]} added to queue!", embed=None, view=None, delete_after=3)
+                        media = bb_media.Media(select.values[0], force_audio_only=True, speed=speed)
+                        await guild_player.play(media)
 
-                ultimate_source = chosen_result[0]
+                    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.danger)
+                    async def cancel_callback(self, button, interaction:discord.interactions.Interaction):
+                        await interaction.response.edit_message(content="Canceled", embed=None, view=None, delete_after=3)
+
+                    @discord.ui.button(label="Play", style=discord.ButtonStyle.success)
+                    async def play_callback(self, button, interaction:discord.interactions.Interaction):
+                        await interaction.response.edit_message(content=f"added to queue!", embed=None, view=None, delete_after=3)
+                        media = bb_media.Media(results[0][0], force_audio_only=True, speed=speed)
+                        await guild_player.play(media)
+
+                view = MyView()
+                results_embed = discord.Embed(title="Youtube Query Results:", color=bb_media.Player.PLAYER_EMBED_COLOR)
+
+                if binded_player:
+                    await ctx.channel.send("", embed=results_embed, view=view)
+                else:
+                    await ctx.respond("", embed=results_embed, view=view)
+                return
         elif shitpost_id is not None:
             ultimate_source = f"shitpost{shitpost_id}"
         else:
@@ -1007,7 +1036,6 @@ async def shitpost(ctx:ApplicationContext, src:str, tags:str, description:str):
         await ctx.respond("Insufficient user privilege")
         return
 
-    # TODO: DEBUG HERE
     media = bb_media.Media(src)
     if media.get_route_type() in (bb_media.Media.GENERIC_AUDIO, bb_media.Media.GENERIC_VIDEO, bb_media.Media.GENERIC_IMAGE):
         media.fetch_file(BOT_DISCORD_FILE_LIMIT)

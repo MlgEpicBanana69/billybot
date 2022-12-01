@@ -7,6 +7,7 @@ import threading
 from urllib.parse import urlparse
 
 import discord
+from discord.ui import Button, View
 import ffmpeg
 import requests
 import validators
@@ -365,9 +366,9 @@ class Media:
 
     def is_web_media(self) -> bool:
         """
-        Returns true if the media needs to be web proccessed on demand
-        Returns false if the media is to a raw source
-        Also returns false if the media is of web type but the proccesing can be done immediately.
+        Returns True if the media needs to be web proccessed on demand
+        Returns False if the media is to a raw source
+        Also returns False if the media is of web type but the proccesing can be done immediately.
         This function will silently perform the immediate proccessing.
         """
         if validators.url(self._source):
@@ -393,12 +394,100 @@ class Player:
     """BillyBot's unique player"""
 
     _players = []  # static variable containing ALL player objects
+    PLAYER_EMBED_COLOR = 16711680
+    PLAYER_EMBED_TEMPLATE = {
+        "type": "rich",
+        "title": "BillyBot PlayerEmbed",
+        "description": "Playing!",
+        "color": PLAYER_EMBED_COLOR,
+        "fields": [
+            {
+                "name": "Currently playing:",
+                "value": "Ch3rry",
+                "inline": False
+            },
+            {
+                "name": "Playing next:",
+                "value": "Hello Marina",
+                "inline": False
+            }
+        ],
+        "thumbnail": {
+            "url": "https://cdn.discordapp.com/attachments/911384860961173575/1045384490035458129/image.png",
+            "height": 0,
+            "width": 0,
+        },
+    }
+    YOUTUBE_QUERY_EMBED_TEMPLATE = {
+        "embeds": [
+            {
+            "type": "rich",
+            "title": "Youtube Query Results:",
+            "description": "a",
+            "color": PLAYER_EMBED_COLOR
+            }
+        ],
+        "components": [
+        {
+            "type": 1,
+            "components": [
+                {
+                "custom_id": "row_0_select_0",
+                "placeholder": "Youtube Query Results",
+                "options": [
+                ],
+                    "min_values": 1,
+                    "max_values": 1,
+                    "type": 3
+                }
+            ]
+        },
+        {
+        "type": 1,
+        "components": [
+            {
+            "style": 4,
+            "label": "Cancel",
+            "custom_id": "row_1_button_0",
+            "disabled": False,
+            "type": 2
+            },
+            {
+            "style": 3,
+            "label": "Play",
+            "custom_id": "row_1_button_1",
+            "disabled": False,
+            "type": 2
+            }
+        ]
+        }
+    ],
+    }
 
     def __init__(self, guild, bot):
         self._players.append(self)
 
         self._guild = guild  # The guild that the player is binded to
         self._bot = bot
+
+        self.view = View()
+        self.compontents = {
+            # "back": Button(style=discord.ButtonStyle.primary, label="<<"),
+            "stop": Button(style=discord.ButtonStyle.danger,  label="Stop", emoji="⏹️"),
+            "resume": Button(style=discord.ButtonStyle.success, label="Resume", emoji="▶️"),
+            "pause": Button(style=discord.ButtonStyle.success, label="Pause", emoji="⏸️"),
+            "skip": Button(style=discord.ButtonStyle.primary, label=">>"),
+            "loop": Button(style=discord.ButtonStyle.secondary, label="Loop", emoji="🔂"),
+            "shuffle": Button(style=discord.ButtonStyle.secondary, label="Shuffle", emoji="🔀"),
+        }
+        #self.compontents["back"] =
+        self.compontents["stop"].callback = self.stop
+        self.compontents["resume"].callback = self.resume
+        self.compontents["pause"].callback = self.pause
+        self.compontents["skip"].callback = self.next
+        self.compontents["loop"].callback = self.toggle_loop
+        self.compontents["shuffle"].callback = self.shuffle
+        [self.view.add_item(val) for val in self.compontents.values()]
 
         self._loop = False # Is the player in loop state
         self._queue = [] # The queue of songs in order
@@ -495,3 +584,12 @@ class Player:
 
     def get_bot(self):
         return self._bot
+
+    def make_embed(self) -> discord.Embed:
+        output_embed = Player.PLAYER_EMBED_TEMPLATE.copy()
+
+        return discord.Embed.from_dict(output_embed)
+
+    def update_queue(self, new_queue):
+        pass
+
