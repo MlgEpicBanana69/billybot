@@ -1062,6 +1062,14 @@ async def shitpost(ctx:ApplicationContext, src:str, tags:str, description:str):
         await ctx.respond(f"Shitpost uploaded succesfuly. (id: {shitpost_id})")
     except mysql.connector.errors.IntegrityError:
         await ctx.respond("Shitpost already exists within database!")
+
+@BillyBot.slash_command(name="sp_macro")
+@discord.option(name="option", type=str,
+    choices=["bober"])
+async def sp_macro(ctx:ApplicationContext, option:str):
+    match option:
+        case "bober":
+            await sp_pull(ctx, shitpost_id=83)
 #endregion
 
 #region intimidation responses
