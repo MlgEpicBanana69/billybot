@@ -122,7 +122,8 @@ class Media:
                             mimestart = mimetypes.guess_type(f"{info['id']}.{info['ext']}")[0]
                         else:
                             raise AssertionError("osuHOW") # NOTE shouldn't occur
-                        thumbnail = info["thumbnails"][-1]["url"]
+                        if len(info["thumbnails"]):
+                            thumbnail = info["thumbnails"][-1]["url"]
                     name = info["title"]
             if (not is_media and ('.' in self._source and '/' in self._source)) or force_raw_source:
                 mimestart = mimetypes.guess_type(urlparse(self._source).path.split('/')[-1])[0]
