@@ -4,10 +4,10 @@ import random
 import re
 import tempfile
 import threading
+import time
 from urllib.parse import urlparse
 
 import discord
-from discord.ui import Button, View
 import ffmpeg
 import requests
 import validators
@@ -39,6 +39,7 @@ class Media:
         self._info = {}
         self._extension = None
         self._local = None
+        self._thumbnail = None
 
         self.force_audio_only = force_audio_only
         self.speed = speed
@@ -68,7 +69,7 @@ class Media:
         video_prefix = "https://www.youtube.com/watch?v="
 
         video_ids = []
-        for tag in re.findall('{"videoId":"[\d\w]{11}",', resp.content.decode('utf-8')):
+        for tag in re.findall('{"videoId":".{11}",', resp.content.decode('utf-8')):
             if video_prefix + tag[12:-2:] not in video_ids:
                 video_ids.append(video_prefix + tag[12:-2:])
         video_titles = [tag[26:-3:] for tag in re.findall('"title":\{"runs":\[\{"text":".+?"\}\]', resp.content.decode('utf-8'))[:-10:]]
@@ -100,6 +101,7 @@ class Media:
         info = {}
         force_raw_source = False
         local = None
+        thumbnail = None
         if validators.url(self._source):
             is_media = self.is_web_media()
             if is_media:
@@ -118,6 +120,7 @@ class Media:
                             mimestart = mimetypes.guess_type(f"{info['id']}.{info['ext']}")[0]
                         else:
                             raise AssertionError("osuHOW") # NOTE shouldn't occur
+                        thumbnail = info["thumbnails"][-1]["url"]
                     name = info["title"]
             if (not is_media and ('.' in self._source and '/' in self._source)) or force_raw_source:
                 mimestart = mimetypes.guess_type(urlparse(self._source).path.split('/')[-1])[0]
@@ -150,6 +153,7 @@ class Media:
         self._extension = extension
         self._info = info
         self._local = local
+        self._thumbnail = thumbnail
 
     def fetch_file(self, size_limit:int=104857600):
         if self._local is None:
@@ -361,6 +365,9 @@ class Media:
     def get_file_extension(self):
         return f"{self._info['ext']}"
 
+    def get_thumbnail(self):
+        return self._thumbnail
+
     def is_streamable(self):
         return self._route_type in (Media.GENERIC_AUDIO, Media.GENERIC_VIDEO)
 
@@ -388,81 +395,63 @@ class Media:
                 return True
         return False
 
-# Need to improve on queue editing, design
-# add youtube query
 class Player:
     """BillyBot's unique player"""
 
     _players = []  # static variable containing ALL player objects
     PLAYER_EMBED_COLOR = 16711680
-    PLAYER_EMBED_TEMPLATE = {
-        "type": "rich",
-        "title": "BillyBot PlayerEmbed",
-        "description": "Playing!",
-        "color": PLAYER_EMBED_COLOR,
-        "fields": [
-            {
-                "name": "Currently playing:",
-                "value": "Ch3rry",
-                "inline": False
-            },
-            {
-                "name": "Playing next:",
-                "value": "Hello Marina",
-                "inline": False
-            }
-        ],
-        "thumbnail": {
-            "url": "https://cdn.discordapp.com/attachments/911384860961173575/1045384490035458129/image.png",
-            "height": 0,
-            "width": 0,
-        },
-    }
-    YOUTUBE_QUERY_EMBED_TEMPLATE = {
-        "embeds": [
-            {
-            "type": "rich",
-            "title": "Youtube Query Results:",
-            "description": "a",
-            "color": PLAYER_EMBED_COLOR
-            }
-        ],
-        "components": [
-        {
-            "type": 1,
-            "components": [
-                {
-                "custom_id": "row_0_select_0",
-                "placeholder": "Youtube Query Results",
-                "options": [
-                ],
-                    "min_values": 1,
-                    "max_values": 1,
-                    "type": 3
-                }
-            ]
-        },
-        {
-        "type": 1,
-        "components": [
-            {
-            "style": 4,
-            "label": "Cancel",
-            "custom_id": "row_1_button_0",
-            "disabled": False,
-            "type": 2
-            },
-            {
-            "style": 3,
-            "label": "Play",
-            "custom_id": "row_1_button_1",
-            "disabled": False,
-            "type": 2
-            }
-        ]
-        }
-    ],
-    }
+
+    STOPPED = 0
+    PAUSED  = 1
+    PLAYING = 2
+
+    class PlayerView(discord.ui.View):
+        def __init__(self, player):
+            super().__init__()
+            self.player = player
+
+        @discord.ui.button(label="Stop", style=discord.ButtonStyle.danger, emoji="⏹️", disabled=True)
+        async def stop_callback(self, button:discord.ui.Button, interaction:discord.interactions.Interaction):
+            await self.player.stop()
+            embed = discord.Embed(title="BillyBot Music Player", description=f"Player was stopped by {interaction.user}")
+            await self.player.wipe_and_remove()
+            await interaction.response.edit_message(view=None, embed=embed, delete_after=300)
+
+        @discord.ui.button(label="Pause", style=discord.ButtonStyle.success, emoji="⏸️")
+        async def pause_resume_callback(self, button:discord.ui.Button, interaction:discord.interactions.Interaction):
+            match self.player.state:
+                case self.player.PAUSED:
+                    await self.player.resume()
+                    button.emoji = "⏸️"
+                    button.label = "Pause"
+                    button.view.children[0].disabled = True
+                case self.player.PLAYING:
+                    await self.player.pause()
+                    button.emoji = "▶️"
+                    button.label = "Resume"
+                    button.view.children[0].disabled = False
+            await interaction.response.edit_message(embed=self.player.make_embed(), view=self)
+
+        @discord.ui.button(label="Skip", style=discord.ButtonStyle.primary, emoji="⏩")
+        async def skip_callback(self, button:discord.ui.Button, interaction:discord.interactions.Interaction):
+            self.player.next()
+            print(f"stop damnit {self.player.get_queue()[0]}")
+            await interaction.response.edit_message(embed=self.player.make_embed(), view=self)
+            print(f"dick {self.player.get_queue()[0]}")
+
+        @discord.ui.button(label="Loop", style=discord.ButtonStyle.secondary, emoji="🔂")
+        async def loop_callback(self, button:discord.ui.Button, interaction:discord.interactions.Interaction):
+            curr_loop = self.player.toggle_loop()
+            if curr_loop:
+                button.emoji = "🔁"
+            else:
+                button.emoji = "🔂"
+            await interaction.response.edit_message(embed=self.player.make_embed(), view=self)
+
+        @discord.ui.button(label="Shuffle", style=discord.ButtonStyle.secondary, emoji="🔀")
+        async def shuffle_callback(self, button:discord.ui.Button, interaction:discord.interactions.Interaction):
+            await self.player.shuffle()
+            await interaction.response.edit_message(embed=self.player.make_embed(), view=self)
 
     def __init__(self, guild, bot):
         self._players.append(self)
@@ -470,27 +459,14 @@ class Player:
         self._guild = guild  # The guild that the player is binded to
         self._bot = bot
 
-        self.view = View()
-        self.compontents = {
-            # "back": Button(style=discord.ButtonStyle.primary, label="<<"),
-            "stop": Button(style=discord.ButtonStyle.danger,  label="Stop", emoji="⏹️"),
-            "resume": Button(style=discord.ButtonStyle.success, label="Resume", emoji="▶️"),
-            "pause": Button(style=discord.ButtonStyle.success, label="Pause", emoji="⏸️"),
-            "skip": Button(style=discord.ButtonStyle.primary, label=">>"),
-            "loop": Button(style=discord.ButtonStyle.secondary, label="Loop", emoji="🔂"),
-            "shuffle": Button(style=discord.ButtonStyle.secondary, label="Shuffle", emoji="🔀"),
-        }
-        #self.compontents["back"] =
-        self.compontents["stop"].callback = self.stop
-        self.compontents["resume"].callback = self.resume
-        self.compontents["pause"].callback = self.pause
-        self.compontents["skip"].callback = self.next
-        self.compontents["loop"].callback = self.toggle_loop
-        self.compontents["shuffle"].callback = self.shuffle
-        [self.view.add_item(val) for val in self.compontents.values()]
+        self.state = Player.STOPPED
 
+        self._skip_flag = False
         self._loop = False # Is the player in loop state
         self._queue = [] # The queue of songs in order
+
+        self.view = Player.PlayerView(self)
+        self.embed = self.make_embed()
 
     async def shuffle(self):
         """Shuffles the queue"""
@@ -504,30 +480,42 @@ class Player:
         self._loop = not self._loop
         return self._loop
 
+    def _next(self):
+        if self._skip_flag:
+            self._skip_flag = False
+        else:
+            self._skip_flag = True
+            self.next()
+
     def next(self):
         """Skips to the next song in the queue"""
 
+        self._skip_flag = not self._skip_flag
         voice = get(self._bot.voice_clients, guild=self._guild)
         if voice is not None:
             if voice.is_playing():
                 voice.stop()
-                return
 
-            if len(self.get_queue()) > 0:
+            if len(self._queue) > 0:
                 if self._loop:
-                    self.get_queue().append(self.get_queue().pop(0))
+                    self._queue.append(self._queue.pop(0))
                 else:
-                    self.get_queue().pop(0)
+                    self._queue.pop(0)
 
-            if len(self.get_queue()) > 0:
-                next_song = self.get_queue()[0]
+            if len(self._queue) > 0:
+                next_song = self._queue[0]
                 print("Playing {0} on guild {1}".format(next_song.get_name(), self.get_guild().name))
                 strm = next_song.get_stream()
-                voice.play(strm, after=lambda e: self.next())
+                voice.play(strm, after=lambda e: self._next())
+                self._set_state(Player.PLAYING)
+            else:
+                self._set_state(Player.STOPPED)
+        else:
+            print("hmm test this one") # TODO: DEBUG
 
     def current_song(self):
         """Returns the name of the current song"""
-        return self.get_queue()[0].get_name()
+        return self._queue[0].get_name()
 
     async def play(self, media):
         """Adds a Media object to the queue"""
@@ -541,7 +529,8 @@ class Player:
         # Plays now if nothing is playing
         if self._queue[0] == media:
             strm = media.get_stream()
-            voice.play(strm, after=lambda e: self.next())
+            voice.play(strm, after=lambda e: self._next())
+            self._set_state(Player.PLAYING)
 
     async def stop(self):
         """Stops and clears the queue"""
@@ -549,14 +538,19 @@ class Player:
         voice = get(self._bot.voice_clients, guild=self._guild)
         if voice is not None:
             get(self._bot.voice_clients, guild=self._guild).stop()
+        self._set_state(Player.STOPPED)
 
     async def pause(self):
         """Pauses play"""
-        get(self._bot.voice_clients, guild=self._guild).pause()
+        if self.state == Player.PLAYING:
+            self._set_state(Player.PAUSED)
+            get(self._bot.voice_clients, guild=self._guild).pause()
 
     async def resume(self):
         """Resumes to playing the queue"""
-        get(self._bot.voice_clients, guild=self._guild).resume()
+        if self.state == Player.PAUSED:
+            self._set_state(Player.PLAYING)
+            get(self._bot.voice_clients, guild=self._guild).resume()
 
     def get_guild(self):
         """Returns the guild this player is attached to"""
@@ -586,10 +580,48 @@ class Player:
         return self._bot
 
     def make_embed(self) -> discord.Embed:
-        output_embed = Player.PLAYER_EMBED_TEMPLATE.copy()
+        thumbnail = None
 
-        return discord.Embed.from_dict(output_embed)
+        embed_field_list = []
+        queue_len = len(self._queue)
+        if queue_len:
+            embed_field_list.append(
+                discord.EmbedField(
+                    name="Currently Playing",
+                    value=self._queue[0].get_name()
+                    )
+                )
+            thumbnail = self._queue[0].get_thumbnail()
+            if queue_len > 1:
+                embed_field_list.append(
+                    discord.EmbedField(
+                        name = "Playing Next",
+                        value=self._queue[1].get_name()
+                    )
+                )
+        if len(embed_field_list) == 0:
+            embed_field_list = None
 
-    def update_queue(self, new_queue):
-        pass
+        output = discord.Embed(
+            title="BillyBot Music Player",
+            description=f"Queue size: {queue_len}",
+            color=Player.PLAYER_EMBED_COLOR,
+            fields=embed_field_list,
+        )
+        if thumbnail:
+            output.set_thumbnail(url=thumbnail)
+        if queue_len > 2:
+            output.set_footer(text=", ".join(media.get_name() for media in self._queue[2::]))
 
+        return output
+
+    def _set_state(self, new_state):
+        match new_state:
+            case Player.PAUSED:
+                pass
+            case Player.STOPPED:
+                pass
+            case Player.PLAYING:
+                pass
+
+        self.state = new_state

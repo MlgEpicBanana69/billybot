@@ -323,7 +323,7 @@ async def play(ctx:ApplicationContext, source:str=None, shitpost_id:int=None, sp
         if guild_player is None:
             binded_player = True
             guild_player = bb_media.Player(ctx.guild, BillyBot)
-            await ctx.respond("", embed=guild_player.make_embed())
+            await ctx.respond("", embed=guild_player.make_embed(), view=guild_player.view)
         ultimate_source = None
 
         if source is not None:
@@ -334,7 +334,7 @@ async def play(ctx:ApplicationContext, source:str=None, shitpost_id:int=None, sp
             else:
                 results = bb_media.Media.query_youtube(source)
 
-                class MyView(discord.ui.View):
+                class YoutubeQueryView(discord.ui.View):
                     @discord.ui.select(
                         placeholder = "Choose a result",
                         min_values = 1,
@@ -342,9 +342,9 @@ async def play(ctx:ApplicationContext, source:str=None, shitpost_id:int=None, sp
                         options = [discord.SelectOption(label=result[1], value=str(i), default=i==0) for i, result in enumerate(results)]
                     )
                     async def select_callback(self, select, interaction:discord.interactions.Interaction): # the function called when the user is done selecting options
-                        index = int(select)
+                        index = int(select.values[0])
                         await interaction.response.edit_message(content=f"{results[index][1]} added to queue!", embed=None, view=None, delete_after=3)
-                        media = bb_media.Media(select.values[0], force_audio_only=True, speed=speed)
+                        media = bb_media.Media(results[index][0], force_audio_only=True, speed=speed)
                         await guild_player.play(media)
 
                     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.danger)
@@ -357,7 +357,7 @@ async def play(ctx:ApplicationContext, source:str=None, shitpost_id:int=None, sp
                         media = bb_media.Media(results[0][0], force_audio_only=True, speed=speed)
                         await guild_player.play(media)
 
-                view = MyView()
+                view = YoutubeQueryView()
                 results_embed = discord.Embed(title="Youtube Query Results:", color=bb_media.Player.PLAYER_EMBED_COLOR)
 
                 if binded_player:
@@ -376,51 +376,6 @@ async def play(ctx:ApplicationContext, source:str=None, shitpost_id:int=None, sp
         await ctx.respond(f"{media.get_name()} added to queue!")
     else:
         await ctx.respond("You're not in any voice channel.")
-
-@BillyBot.slash_command(name="stop")
-async def stop(ctx:ApplicationContext):
-    """Stops the music and clears the queue"""
-    await bb_media.Player.get_player(ctx.guild).stop()
-    await ctx.respond("Player stopped.")
-
-@BillyBot.slash_command(name="pause")
-async def pause(ctx:ApplicationContext):
-    """Pauses the current song"""
-    if ctx.guild.me.voice.channel == ctx.author.voice.channel and ctx.guild.me.voice is not None:
-        await ctx.respond("Now paused.")
-        await bb_media.Player.get_player(ctx.guild).pause()
-
-@BillyBot.slash_command(name="resume")
-async def resume(ctx:ApplicationContext):
-    """Pauses the current song"""
-    if ctx.guild.me.voice.channel == ctx.author.voice.channel and ctx.guild.me.voice is not None:
-        await ctx.respond("Resumed.")
-        await bb_media.Player.get_player(ctx.guild).resume()
-
-@BillyBot.slash_command(name="skip")
-async def skip(ctx:ApplicationContext):
-    """Skips to the next song in queue"""
-    await ctx.respond("Skipped")
-    guild_player = bb_media.Player.get_player(ctx.guild)
-    guild_player.next()
-
-@BillyBot.slash_command(name="shuffle")
-async def shuffle(ctx:ApplicationContext):
-    """Shuffles the queue"""
-    await bb_media.Player.get_player(ctx.guild).shuffle()
-
-@BillyBot.slash_command(name="loop")
-async def loop(ctx:ApplicationContext):
-    """Toggles playlist loop on/off"""
-    await ctx.defer()
-    loop_state = bb_media.Player.get_player(ctx.guild).toggle_loop()
-    loop_state = "ON" if loop_state else "OFF"
-    await ctx.respond("Loop is now {0}".format(loop_state))
-
-@BillyBot.slash_command(name="skipto")
-async def skipto(ctx:ApplicationContext, position: int):
-    """Skips to a position in queue"""
-    await bb_media.Player.get_player(ctx.guild).goto(position)
 
 @BillyBot.slash_command(name="queue")
 async def queue(ctx:ApplicationContext):
@@ -848,31 +803,32 @@ async def sp_pull(ctx:ApplicationContext, shitpost_id:int=None, keyphrase:str=No
 
     Parameters
     ----------
-    ctx : ApplicationContext
+    ctx : `ApplicationContext`
         Discord context
-    shitpost_id : int
+    shitpost_id : `int`
         Filter shitposts by id. Can only match one or more shitposts.
-    keyphrase : str
+    keyphrase : `str`
         Filter shitposts by a keyphrase. This argument is used to match shitposts
         off their description value.
-    tags : str
+    tags : `str`
         A string of tags each seperated by a space. Filters shitposts to require *all* of the tags given
-    minimum_rating : int
+    minimum_rating : `int`
         the minimum shitpost rating allowed by the filter, inclusive.
-    maximum_rating : int
+    maximum_rating : `int`
         the maximum shitpost rating allowed by the filter, inclusive.
-    allow_unrated : bool
+    allow_unrated : `bool`
         allows shitposts without a rating to bypass the rating filters.
-    choose_limit : int
+    choose_limit : `int`
         Sets the limit of how many shitposts are allowed to be pulled.
-        If there are more matches than the limit allows this function responds with an
-        ephemeral list of all matches found without sending the media files themselves.
-        If this argument is set to 0, this function will not enforce any limit
-    choose_random : bool
+        If there are more matches than the limit allows this function
+        responds with an `ephemeral` `list` of all matches found
+        without sending the media files themselves. If this argument
+        is set to `0`, this function will not enforce any limit
+    choose_random : `bool`
         Out of all matches found, only send one shitpost at random.
-    get_details : bool
+    get_details : `bool`
         Option to only get the metadata of the shitpost rather than the media file itself.
-        When set to true, this function will not send the media file of matched shitpost/s
+        When set to `True`, this function will not send the media file of matched shitpost/s
     """
 
     await ctx.defer(ephemeral=True)
