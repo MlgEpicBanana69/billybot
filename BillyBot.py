@@ -323,7 +323,7 @@ async def play(ctx:ApplicationContext, source:str=None, shitpost_id:int=None, sp
         if guild_player is None:
             binded_player = True
             guild_player = bb_media.Player(ctx.guild, BillyBot)
-            await ctx.respond("", embed=guild_player.make_embed(), view=guild_player.view)
+            await guild_player.bind_player_to_ctx(ctx)
         ultimate_source = None
 
         if source is not None:
@@ -376,6 +376,51 @@ async def play(ctx:ApplicationContext, source:str=None, shitpost_id:int=None, sp
         await ctx.respond(f"{media.get_name()} added to queue!")
     else:
         await ctx.respond("You're not in any voice channel.")
+
+@BillyBot.slash_command(name="stop")
+async def stop(ctx:ApplicationContext):
+    """Stops the music and clears the queue"""
+    await bb_media.Player.get_player(ctx.guild).stop(ctx.author)
+    await ctx.respond("Player stopped.")
+
+@BillyBot.slash_command(name="pause")
+async def pause(ctx:ApplicationContext):
+    """Pauses the current song"""
+    if ctx.guild.me.voice.channel == ctx.author.voice.channel and ctx.guild.me.voice is not None:
+        await ctx.respond("Now paused.")
+        await bb_media.Player.get_player(ctx.guild).pause()
+
+@BillyBot.slash_command(name="resume")
+async def resume(ctx:ApplicationContext):
+    """Pauses the current song"""
+    if ctx.guild.me.voice.channel == ctx.author.voice.channel and ctx.guild.me.voice is not None:
+        await ctx.respond("Resumed.")
+        await bb_media.Player.get_player(ctx.guild).resume()
+
+@BillyBot.slash_command(name="skip")
+async def skip(ctx:ApplicationContext):
+    """Skips to the next song in queue"""
+    await ctx.respond("Skipped")
+    guild_player = bb_media.Player.get_player(ctx.guild)
+    guild_player.next()
+
+@BillyBot.slash_command(name="shuffle")
+async def shuffle(ctx:ApplicationContext):
+    """Shuffles the queue"""
+    await bb_media.Player.get_player(ctx.guild).shuffle()
+
+@BillyBot.slash_command(name="loop")
+async def loop(ctx:ApplicationContext):
+    """Toggles playlist loop on/off"""
+    await ctx.defer()
+    loop_state = bb_media.Player.get_player(ctx.guild).toggle_loop()
+    loop_state = "ON" if loop_state else "OFF"
+    await ctx.respond("Loop is now {0}".format(loop_state))
+
+@BillyBot.slash_command(name="skipto")
+async def skipto(ctx:ApplicationContext, position: int):
+    """Skips to a position in queue"""
+    await bb_media.Player.get_player(ctx.guild).goto(position)
 
 @BillyBot.slash_command(name="queue")
 async def queue(ctx:ApplicationContext):

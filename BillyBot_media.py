@@ -8,9 +8,11 @@ import time
 from urllib.parse import urlparse
 
 import discord
+import nest_asyncio
 import ffmpeg
 import requests
 import validators
+import asyncio
 from discord.utils import get
 from youtube_dl import YoutubeDL
 
@@ -410,48 +412,51 @@ class Player:
             super().__init__()
             self.player = player
 
+        @discord.ui.button(label="Refresh", style=discord.ButtonStyle.secondary, emoji="🔄")
+        async def refresh_callback(self, button:discord.ui.Button, interaction:discord.interactions.Interaction):
+            await interaction.response.edit_message(embed=self.player.make_embed(), view=self)
+
         @discord.ui.button(label="Stop", style=discord.ButtonStyle.danger, emoji="⏹️", disabled=True)
         async def stop_callback(self, button:discord.ui.Button, interaction:discord.interactions.Interaction):
-            await self.player.stop()
-            embed = discord.Embed(title="BillyBot Music Player", description=f"Player was stopped by {interaction.user}")
-            await self.player.wipe_and_remove()
-            await interaction.response.edit_message(view=None, embed=embed, delete_after=300)
+            if button.label == "Stop":
+                await self.player.stop()
+                #button.label = "Remove"
+                #button.emoji = ""
+                #await interaction.response.edit_message(embed=self.player.make_embed, view=self)
+            if button.label == "Remove":
+                await self.player.wipe_and_remove()
+                # embed = discord.Embed(title="BillyBot Music Player", description=f"Player was stopped by {interaction.user}")
+                # await interaction.response.edit_message(view=None, embed=embed, delete_after=300)
+            await interaction.response.edit_message()
 
         @discord.ui.button(label="Pause", style=discord.ButtonStyle.success, emoji="⏸️")
         async def pause_resume_callback(self, button:discord.ui.Button, interaction:discord.interactions.Interaction):
-            match self.player.state:
-                case self.player.PAUSED:
-                    await self.player.resume()
-                    button.emoji = "⏸️"
-                    button.label = "Pause"
-                    button.view.children[0].disabled = True
-                case self.player.PLAYING:
-                    await self.player.pause()
-                    button.emoji = "▶️"
-                    button.label = "Resume"
-                    button.view.children[0].disabled = False
-            await interaction.response.edit_message(embed=self.player.make_embed(), view=self)
+            if button.label == "Resume":
+                button.emoji = "⏸️"
+                button.label = "Pause"
+                button.view.children[0].disabled = True
+                await self.player.resume()
+            elif button.label == "Pause":
+                button.emoji = "▶️"
+                button.label = "Resume"
+                button.view.children[0].disabled = False
+                await self.player.pause()
+            await interaction.response.edit_message()
 
         @discord.ui.button(label="Skip", style=discord.ButtonStyle.primary, emoji="⏩")
         async def skip_callback(self, button:discord.ui.Button, interaction:discord.interactions.Interaction):
-            self.player.next()
-            print(f"stop damnit {self.player.get_queue()[0]}")
-            await interaction.response.edit_message(embed=self.player.make_embed(), view=self)
-            print(f"dick {self.player.get_queue()[0]}")
+            await interaction.response.edit_message()
+            await self.player.next()
 
         @discord.ui.button(label="Loop", style=discord.ButtonStyle.secondary, emoji="🔂")
         async def loop_callback(self, button:discord.ui.Button, interaction:discord.interactions.Interaction):
-            curr_loop = self.player.toggle_loop()
-            if curr_loop:
-                button.emoji = "🔁"
-            else:
-                button.emoji = "🔂"
-            await interaction.response.edit_message(embed=self.player.make_embed(), view=self)
+            await self.player.toggle_loop()
+            await interaction.response.edit_message()
 
         @discord.ui.button(label="Shuffle", style=discord.ButtonStyle.secondary, emoji="🔀")
         async def shuffle_callback(self, button:discord.ui.Button, interaction:discord.interactions.Interaction):
             await self.player.shuffle()
-            await interaction.response.edit_message(embed=self.player.make_embed(), view=self)
+            await interaction.response.edit_message()
 
     def __init__(self, guild, bot):
         self._players.append(self)
@@ -461,33 +466,27 @@ class Player:
 
         self.state = Player.STOPPED
 
-        self._skip_flag = False
         self._loop = False # Is the player in loop state
         self._queue = [] # The queue of songs in order
+        self.binding = None
+        self._skip_flag = False
 
         self.view = Player.PlayerView(self)
-        self.embed = self.make_embed()
+        self.embed = None
 
-    async def shuffle(self):
-        """Shuffles the queue"""
-        if len(self._queue) > 0:
-            temp = self._queue.pop(0)
-            random.shuffle(self._queue)
-            self._queue.insert(0, temp)
+    def current_song(self):
+        """Returns the name of the current song"""
+        return self._queue[0].get_name()
 
-    def toggle_loop(self):
-        """Toggles loop"""
-        self._loop = not self._loop
-        return self._loop
-
-    def _next(self):
+    #region player control
+    async def _next(self):
         if self._skip_flag:
             self._skip_flag = False
         else:
             self._skip_flag = True
-            self.next()
+            await self.next()
 
-    def next(self):
+    async def next(self):
         """Skips to the next song in the queue"""
 
         self._skip_flag = not self._skip_flag
@@ -506,16 +505,18 @@ class Player:
                 next_song = self._queue[0]
                 print("Playing {0} on guild {1}".format(next_song.get_name(), self.get_guild().name))
                 strm = next_song.get_stream()
-                voice.play(strm, after=lambda e: self._next())
+                voice.play(strm, after=lambda e: asyncio.run(self._next()))
                 self._set_state(Player.PLAYING)
             else:
                 self._set_state(Player.STOPPED)
         else:
             print("hmm test this one") # TODO: DEBUG
 
-    def current_song(self):
-        """Returns the name of the current song"""
-        return self._queue[0].get_name()
+        try:
+            if self.binding:
+                await self.binding.edit(view=self.view, embed=self.make_embed())
+        except Exception as e:
+            pass
 
     async def play(self, media):
         """Adds a Media object to the queue"""
@@ -529,8 +530,11 @@ class Player:
         # Plays now if nothing is playing
         if self._queue[0] == media:
             strm = media.get_stream()
-            voice.play(strm, after=lambda e: self._next())
+            voice.play(strm, after=lambda e: asyncio.run(self._next()))
             self._set_state(Player.PLAYING)
+
+        if self.binding:
+            await self.binding.edit(view=self.view, embed=self.make_embed())
 
     async def stop(self):
         """Stops and clears the queue"""
@@ -540,11 +544,17 @@ class Player:
             get(self._bot.voice_clients, guild=self._guild).stop()
         self._set_state(Player.STOPPED)
 
+        if self.binding:
+            await self.binding.edit(view=self.view, embed=self.make_embed())
+
     async def pause(self):
         """Pauses play"""
         if self.state == Player.PLAYING:
             self._set_state(Player.PAUSED)
             get(self._bot.voice_clients, guild=self._guild).pause()
+
+        if self.binding:
+            await self.binding.edit(view=self.view, embed=self.make_embed())
 
     async def resume(self):
         """Resumes to playing the queue"""
@@ -552,9 +562,54 @@ class Player:
             self._set_state(Player.PLAYING)
             get(self._bot.voice_clients, guild=self._guild).resume()
 
+        if self.binding:
+            await self.binding.edit(view=self.view, embed=self.make_embed())
+
+    async def wipe_and_remove(self, issuer=None):
+        """Stops playing and wipes the player back into default settings"""
+        self._queue = []
+        voice = get(self._bot.voice_clients, guild=self._guild)
+        if voice is not None:
+            get(self._bot.voice_clients, guild=self._guild).stop()
+        self._set_state(Player.STOPPED)
+
+        self._loop = False
+
+        Player._players.remove(self)
+
+        if self.binding:
+            embed = discord.Embed(title="BillyBot Music Player", description=f"Player was stopped by {issuer}")
+            await self.binding.edit(view=None, embed=embed, delete_after=300)
+
+    async def toggle_loop(self):
+        """Toggles loop"""
+        self._loop = not self._loop
+
+        if self.binding:
+            await self.binding.edit(view=self.view, embed=self.make_embed())
+
+        return self._loop
+
+    async def shuffle(self):
+        """Shuffles the queue"""
+        if len(self._queue) > 0:
+            temp = self._queue.pop(0)
+            random.shuffle(self._queue)
+            self._queue.insert(0, temp)
+
+        if self.binding:
+            await self.binding.edit(view=self.view, embed=self.make_embed())
+    #endregion
+
     def get_guild(self):
         """Returns the guild this player is attached to"""
         return self._guild
+
+    async def bind_player_to_ctx(self, ctx):
+        if self.binding is not None:
+            raise AssertionError("Cannot bind player that is already bound!")
+        await ctx.respond("", embed=self.make_embed(), view=self.view)
+        self.binding = ctx
 
     @staticmethod
     def get_player(guild):
@@ -566,15 +621,6 @@ class Player:
     def get_queue(self):
         """Returns the player's queue"""
         return self._queue
-
-    async def wipe_and_remove(self):
-        """Stops playing and wipes the player back into default settings"""
-        await self.stop()
-
-        self._loop = False
-        self._queue = []
-
-        Player._players.remove(self)
 
     def get_bot(self):
         return self._bot
