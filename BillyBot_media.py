@@ -435,12 +435,12 @@ class Player:
             if button.label == "Resume":
                 button.emoji = "⏸️"
                 button.label = "Pause"
-                button.view.children[0].disabled = True
+                button.view.children[1].disabled = True
                 await self.player.resume()
             elif button.label == "Pause":
                 button.emoji = "▶️"
                 button.label = "Resume"
-                button.view.children[0].disabled = False
+                button.view.children[1].disabled = False
                 await self.player.pause()
             await interaction.response.edit_message()
 
