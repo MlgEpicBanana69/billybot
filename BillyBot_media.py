@@ -411,7 +411,7 @@ class Player:
     class PlayerView(discord.ui.View):
         def __init__(self, player):
             super().__init__()
-            self.player = player
+            self.player: Player = player
 
         @discord.ui.button(label="Refresh", style=discord.ButtonStyle.secondary, emoji="🔄")
         async def refresh_callback(self, button:discord.ui.Button, interaction:discord.interactions.Interaction):
@@ -421,7 +421,7 @@ class Player:
         async def stop_callback(self, button:discord.ui.Button, interaction:discord.interactions.Interaction):
             if button.label == "Stop":
                 await self.player.stop()
-                #button.label = "Remove"
+                button.label = "Remove"
                 #button.emoji = ""
                 #await interaction.response.edit_message(embed=self.player.make_embed, view=self)
             if button.label == "Remove":
@@ -432,6 +432,9 @@ class Player:
 
         @discord.ui.button(label="Pause", style=discord.ButtonStyle.success, emoji="⏸️")
         async def pause_resume_callback(self, button:discord.ui.Button, interaction:discord.interactions.Interaction):
+            if len(self.player.get_queue()) == 0:
+                await interaction.response.defer()
+
             if button.label == "Resume":
                 button.emoji = "⏸️"
                 button.label = "Pause"
@@ -446,6 +449,10 @@ class Player:
 
         @discord.ui.button(label="Skip", style=discord.ButtonStyle.primary, emoji="⏩")
         async def skip_callback(self, button:discord.ui.Button, interaction:discord.interactions.Interaction):
+            for child in self.children:
+                if child.label == "Resume":
+                    button.emoji = "⏸️"
+                    button.label = "Pause"
             await interaction.response.edit_message()
             await self.player.next()
 
