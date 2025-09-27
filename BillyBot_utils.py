@@ -33,6 +33,10 @@ def merge_pixels(foreground, background):
 
 # Returns true if given string is a valid URL
 def validate_url(src: str) -> bool:
+    forbidden_chars = '<> "{}|\^`'
+    for forbidden_character in forbidden_chars:
+        if (forbidden_character in src):
+            return False
     parse = urlparse(src)
     return bool(parse.scheme and parse.netloc)
 
