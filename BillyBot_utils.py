@@ -34,7 +34,7 @@ def merge_pixels(foreground, background):
 # Returns true if given string is a valid URL
 def validate_url(src: str) -> bool:
     parse = urlparse(src)
-    return parse.scheme and parse.netloc
+    return bool(parse.scheme and parse.netloc)
 
 #region discord
 def discord_mention_to_user_id(ctx, discord_mention:str):
