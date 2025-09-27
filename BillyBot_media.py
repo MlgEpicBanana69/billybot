@@ -4,17 +4,16 @@ import random
 import re
 import tempfile
 import threading
-import time
 from urllib.parse import urlparse
 
 import discord
-import nest_asyncio
 import ffmpeg
 import requests
-import validators
 import asyncio
 from discord.utils import get
 from yt_dlp import YoutubeDL
+
+from BillyBot_utils import validate_url
 
 mimetypes.init()
 
@@ -104,7 +103,7 @@ class Media:
         force_raw_source = False
         local = None
         thumbnail = None
-        if validators.url(self._source):
+        if validate_url(self._source):
             is_media = self.is_web_media()
             if is_media:
                 with YoutubeDL(ydl_options) as ydl:
@@ -381,7 +380,8 @@ class Media:
         Also returns False if the media is of web type but the proccesing can be done immediately.
         This function will silently perform the immediate proccessing.
         """
-        if validators.url(self._source):
+        if validate_url(self._source):
+
             if self._source.startswith("https://www.youtube.com/shorts/"):
                 self._source = "https://www.youtube.com/watch?v=" + self._source.split("https://www.youtube.com/shorts/")[-1]
 
@@ -391,8 +391,13 @@ class Media:
                 return True
             elif self._source.startswith("https://tenor.com/view/"):
                 tenor_resp = requests.get(self._source)
-                matches = re.search("https:\/\/media\.tenor\.com\/.+?\/.+?\.gif", tenor_resp.text)
-                self._source = matches.group(0)
+                matches = re.findall("https:\/\/media\.tenor\.com\/.+?\/.+?\.gif", tenor_resp.text)
+                best_match = ""
+                for match in matches:
+                    if validate_url(match):
+                        if len(best_match) == 0 or match.endswith('.gif'):
+                            best_match = match
+                self._source = best_match
                 return False
             elif self._source.startswith("https://twitter.com/") and (not "/photo/" in self._source):
                 return True
