@@ -1,4 +1,5 @@
 import numpy as np
+from urllib.parse import urlparse
 
 # https://en.wikipedia.org/wiki/Alpha_compositing
 def merge_pixels(foreground, background):
@@ -29,6 +30,11 @@ def merge_pixels(foreground, background):
                     * background_alpha * (1 - foreground_alpha)) / merged_alpha
     return np.array([int(merged_red * 255), int(merged_green * 255),
                      int(merged_blue * 255), int(merged_alpha * 255)])
+
+# Returns true if given string is a valid URL
+def validate_url(src: str) -> bool:
+    parse = urlparse(src)
+    return parse.scheme and parse.netloc
 
 #region discord
 def discord_mention_to_user_id(ctx, discord_mention:str):
