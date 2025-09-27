@@ -11,7 +11,6 @@ from discord.commands.context import ApplicationContext
 import mysql.connector
 import numpy as np
 import requests
-import validators
 from bs4 import BeautifulSoup
 from discord.ext import commands
 from dotenv import load_dotenv
@@ -328,7 +327,7 @@ async def play(ctx:ApplicationContext, source:str=None, shitpost_id:int=None, sp
 
         if source is not None:
             # Source is message content
-            if validators.url(source):
+            if bb_utils.validate_url(source):
                 ultimate_source = source
             # Source is youtube query
             else:
@@ -480,7 +479,7 @@ async def cyber(ctx:ApplicationContext, args=""):
     """Overlays the text סייבר on a given image."""
 
     await ctx.defer()
-    message_sources = [arg for arg in args.split(' ') if validators.url(arg)]
+    message_sources = [arg for arg in args.split(' ') if bb_utils.validate_url(arg)]
     img_objects = []
     for i, source in enumerate(message_sources):
         image_obj = bb_media.Media(source)
