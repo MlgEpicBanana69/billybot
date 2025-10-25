@@ -127,12 +127,16 @@ class Media:
             if (not is_media and ('.' in self._source and '/' in self._source)) or force_raw_source:
                 mimestart = mimetypes.guess_type(urlparse(self._source).path.split('/')[-1])[0]
                 name = urlparse(self._source).path.split('/')[-1]
-                info = {"url": self._source, "id": ".".join(name.split('.')[:-1]), "ext": name.split('.')[-1]}
+                ext = name.split('.')[-1].lower()
+                info = {"url": self._source, "id": ".".join(name.split('.')[:-1]), "ext": ext}
 
             if mimestart is not None:
                 if mimestart.split('/')[0] in ['video', 'audio', 'image']:
                     route = "generic_" + mimestart.split('/')[0]
                     extension = mimestart.split('/')[1]
+            elif ext.lower() in ("webp"):
+                route = "generic_image"
+                extension = ext
             elif len(urlparse(self._source).path.split('/')[-1].split('.')) == 2:
                 route = Media.GENERIC_FILE
         elif self._source.startswith("shitpost"):
