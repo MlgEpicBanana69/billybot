@@ -224,7 +224,7 @@ async def dolev(ctx:ApplicationContext, equation):
 
 @BillyBot.slash_command(name="bibi")
 async def bibi(ctx:ApplicationContext):
-    """Sends a picture of Israel's **EX** prime minister Benjamin Netanyahu."""
+    """Sends a picture of Israel's prime minister Benjamin Netanyahu."""
     bb_images = os.listdir("resources\\static\\bibi\\")
     with open("resources\\static\\bibi\\" + random.choice(bb_images), "rb") as bb_pick:
         await ctx.respond(file=discord.File(fp=bb_pick, filename="bb.png"))
@@ -1107,7 +1107,7 @@ async def cyber_intimidation(message, keyphrase):
         insults = f.read().split('\n')
     with open("resources/static/cyber_intimidation.txt", mode="r") as f:
         cyber_msg = f.read()
-    rip_bozo_gif_url = "https://tenor.com/view/rip-bozo-gif-22294771"
+    rip_bozo_gif_url = "https://tenor.com/view/rip-bozo-gif-w22294771"
     output_msg = f"{message.author.mention} this you?\n\n{cyber_msg}\n{repr(message)}\n\n{rip_bozo_gif_url}"
 
     for insult in insults:
