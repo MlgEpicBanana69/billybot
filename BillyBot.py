@@ -604,7 +604,7 @@ async def merge_collections(ctx:ApplicationContext, collections):
 async def glory_days(ctx:ApplicationContext, language:str="en"):
     copypastas = {
                     "en": "To seek the Glory Days 🌅 We’ll fight the lion’s way 🦁 Then let the rain wash 🌧 All of our pride away 😇 So if this victory 🏆 Is our last odyssey 🚗 Then let the POWER within us decide! 💪",
-                    "he": "לחפש אחרי ימי התהילה 🌅 נלחם בדרך האריה 🦁 ואז נתן לגשם לשטוף 🌧️ את כל גאוותנו 😇 אז אם הניצחון הזה 🏆 הוא המסע הקשה האחרון שלנו 🚗 אז תן לכוח שבתוכנו להחליט 💪",
+                    "he": "בשביל לרדוף אחרי ימי התהילה 🌅 נלחם בדרך האריה 🦁 ואז נתן לגשם לשטוף 🌧️ את כל גאוותנו 😇 אז אם הניצחון הזה 🏆 הוא המסע הקשה האחרון שלנו 🚗 אז תן לכוח שבתוכנו להחליט 💪",
                     "sp": "Para buscar los Gloriosos Días 🌅 Lucharemos como los leones 🦁 Y deja que la lluvia lave 🌧️ Todo nuestro orgullo 😇 Así que si está victoria 🏆 Es nuestra última odisea 🚗 Entonces deja que el PODER dentro de nosotros decida! 💪",
                     "jp": "栄光の日々を求めるために🌅 我々は獅子の道を戦います🦁 そして雨が洗い流します🌧 我々のプライドのすべてを洗い流します 😇 もしこの勝利が我々の最後のオデッセイであるなら 🚗 それなら我々の中にあるパワーに決めさせてください! 💪",
                     "ru": "Щоб шукати днів слави🌅 Ми будемо битися на шляху лева 🦁 Потім нехай дощ змиє🌧 Всю нашу гордість😇 Тож якщо ця перемога 🏆 наша остання одіссея 🚗 Тоді нехай СИЛА всередині нас вирішить!",
