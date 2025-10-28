@@ -316,6 +316,7 @@ async def play(ctx:ApplicationContext, source:str=None, shitpost_id:int=None, sp
     """
     await ctx.defer()
     if ctx.author.voice is not None:
+        #if ctx.author.voice.channel not in [voice_client.channel for voice_client in ctx.bot.voice_clients]:
         await bot_join(ctx)
         guild_player = bb_media.Player.get_player(ctx.guild)
         binded_player = False
