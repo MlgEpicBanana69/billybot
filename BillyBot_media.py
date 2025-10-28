@@ -88,10 +88,16 @@ class Media:
         if self.force_audio_only:
             ydl_options = {'format': 'bestaudio/best',
                         'noplaylist': True,
-                        'youtube_include_dash_manifest': False}
+                        'youtube_include_dash_manifest': False,
+                        'quiet': True,
+                        'vebose': False,
+                        'no_warnings': True}
         else:
             ydl_options = {'noplaylist': True,
-                        'youtube_include_dash_manifest': False}
+                        'youtube_include_dash_manifest': False,
+                        'quiet': True,
+                        'vebose': False,
+                        'no_warnings': True}
             #ydl_options = {'format': 'bestvideo+bestaudio/bestaudio/bestvideo[ext=gif]/best',
             #            'noplaylist':'True',
             #            'youtube_include_dash_manifest': False}
@@ -261,12 +267,18 @@ class Media:
     def get_ultimate_sources(self, *, no_video:bool, sizelimit:int=104857600) -> dict:
         if no_video:
             ydl_options = {'format': 'worseaudio/bestaudio',
-                        'noplaylist':True,
-                        'youtube_include_dash_manifest': False}
+                        'noplaylist': True,
+                        'youtube_include_dash_manifest': False,
+                        'quiet': True,
+                        'vebose': False,
+                        'no_warnings': True}
         else:
             ydl_options = {'format': 'bestvideo[ext=mp4]+bestaudio/bestvideo+bestaudio',
-                    'noplaylist':True,
-                    'youtube_include_dash_manifest': False}
+                    'noplaylist': True,
+                    'youtube_include_dash_manifest': False,
+                    'quiet': True,
+                    'vebose': False,
+                    'no_warnings': True}
 
         #ydl_options = {'format': "bestvideo[filesize<8MiB][ext=mp4]+bestaudio/best",
         #            'noplaylist':'True',
@@ -422,10 +434,6 @@ class Player:
             super().__init__()
             self.player: Player = player
 
-        @discord.ui.button(label="Refresh", style=discord.ButtonStyle.secondary, emoji="🔄")
-        async def refresh_callback(self, button:discord.ui.Button, interaction:discord.interactions.Interaction):
-            await interaction.response.edit_message(embed=self.player.make_embed(), view=self)
-
         @discord.ui.button(label="Stop", style=discord.ButtonStyle.danger, emoji="⏹️", disabled=True)
         async def stop_callback(self, button:discord.ui.Button, interaction:discord.interactions.Interaction):
             if button.label == "Stop":
@@ -441,21 +449,27 @@ class Player:
 
         @discord.ui.button(label="Pause", style=discord.ButtonStyle.success, emoji="⏸️")
         async def pause_resume_callback(self, button:discord.ui.Button, interaction:discord.interactions.Interaction):
+            
             if len(self.player.get_queue()) == 0:
-                await interaction.response.defer()
-
-            if button.label == "Resume":
-                button.emoji = "⏸️"
-                button.label = "Pause"
-                button.view.children[1].disabled = True
-                await self.player.resume()
-            elif button.label == "Pause":
+                await interaction.response.is_done()
+                return
+            
+            pausing = button.label == "Pause"
+            if pausing:
+                # Pause play
                 button.emoji = "▶️"
                 button.label = "Resume"
-                button.view.children[1].disabled = False
+                button.view.children[0].disabled = False
                 await self.player.pause()
-            await interaction.response.edit_message()
+            else:
+                # Resume play
+                button.emoji = "⏸️"
+                button.label = "Pause"
+                button.view.children[0].disabled = True
+                await self.player.resume()
 
+            await interaction.response.edit_message()
+            
         @discord.ui.button(label="Skip", style=discord.ButtonStyle.primary, emoji="⏩")
         async def skip_callback(self, button:discord.ui.Button, interaction:discord.interactions.Interaction):
             for child in self.children:
@@ -642,6 +656,7 @@ class Player:
     def get_bot(self):
         return self._bot
 
+    # Way too expensive, needs a workaround
     def make_embed(self) -> discord.Embed:
         thumbnail = None
 
