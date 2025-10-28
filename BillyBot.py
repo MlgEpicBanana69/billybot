@@ -3,6 +3,7 @@ import hashlib
 import io
 import os
 import random
+from concurrent.futures import ThreadPoolExecutor
 
 import cv2
 import datetime
@@ -47,8 +48,12 @@ from BillyBot_osu import BillyBot_osu
 
 load_dotenv()
 
+
+BILLYBOT_MAX_WORKERS = max(64, os.cpu_count() + 4)
 intents = discord.Intents.all()
+
 BillyBot = discord.Bot(intents=intents)
+BillyBot.loop.set_default_executor(ThreadPoolExecutor(max_workers=BILLYBOT_MAX_WORKERS))
 
 BOT_DISCORD_FILE_LIMIT = bb_media.Media.DISCORD_FILE_LIMITERS[0]
 DISCORD_MESSAGE_SIZE_LIMITS = (2000,)
@@ -452,10 +457,7 @@ async def bot_join(ctx:ApplicationContext, respond_on_join=False):
         await ctx.author.voice.channel.connect()
     elif ctx.guild.voice_client.channel != ctx.author.voice.channel:
         await ctx.guild.me.move_to(ctx.author.voice.channel)
-    try:
-        await ctx.guild.me.edit(deafen=True)
-    except discord.errors.Forbidden:
-        raise  # Silent permission error because the self deafen is purely cosmetic kekW
+    await ctx.guild.me.edit(deafen=True)
     if respond_on_join:
         await ctx.respond("Joined your VC", delete_after=5)
 
