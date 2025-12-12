@@ -65,11 +65,12 @@ auto_say_members = []
 
 discord_token = os.environ.get("discord_token")
 osu_token = os.environ.get("osu_token")
+sql_usr = os.environ.get("sql_usr")
 sql_pw = os.environ.get("sql_pw")
 bb_osu = BillyBot_osu(osu_token)
 
 # Connect to the shitposting database
-sql_connection = mysql.connector.connect(user="light", password=sql_pw, host="127.0.0.1", database="billybot_db")
+sql_connection = mysql.connector.connect(user=sql_usr, password=sql_pw, host="127.0.0.1", database="billybot_db")
 sql_cursor = sql_connection.cursor()
 
 #region Bot events
