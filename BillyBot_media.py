@@ -295,7 +295,7 @@ class Media:
                         fr['url'] = fr['fragment_base_url']
 
             arr = self._info['formats']
-            arr = sorted(self._info['formats'], key=lambda i: i['quality'], reverse=False)
+            arr = sorted(self._info['formats'], key=lambda i: i['quality'] if i['quality'] is not None else -1, reverse=False)
             def format_condition(x, exts, is_video) -> bool:
                 try:
                     assert x['ext'] in exts or len(exts) == 0
@@ -449,11 +449,11 @@ class Player:
 
         @discord.ui.button(label="Pause", style=discord.ButtonStyle.success, emoji="⏸️")
         async def pause_resume_callback(self, button:discord.ui.Button, interaction:discord.interactions.Interaction):
-            
+
             if len(self.player.get_queue()) == 0:
                 await interaction.response.is_done()
                 return
-            
+
             pausing = button.label == "Pause"
             if pausing:
                 # Pause play
@@ -469,7 +469,7 @@ class Player:
                 await self.player.resume()
 
             await interaction.response.edit_message()
-            
+
         @discord.ui.button(label="Skip", style=discord.ButtonStyle.primary, emoji="⏩")
         async def skip_callback(self, button:discord.ui.Button, interaction:discord.interactions.Interaction):
             for child in self.children:
