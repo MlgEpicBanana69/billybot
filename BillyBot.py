@@ -146,11 +146,13 @@ async def serverstatus(ctx:ApplicationContext):
     scanner = nmap.PortScanner()
     scan = scanner.scan(ip, arguments=f"-np {port}")
 
-    status = scan['scan'][ip]['tcp'][int(port)]['state']
-    if (status == "open"):
-        await ctx.respond(f"{ctx.author.mention} Server is currently running!")
-    else:
-        await ctx.respond(f"{ctx.author.mention} Server is currently closed.")
+    if (ip in scan['scan']):
+        status = scan['scan'][ip]['tcp'][int(port)]['state']
+        if (status == "open"):
+            await ctx.respond(f"{ctx.author.mention} Server is currently running!")
+            return
+
+    await ctx.respond(f"{ctx.author.mention} Server is currently closed.")
 
 @BillyBot.slash_command(name="say")
 async def say(ctx:ApplicationContext, message):
