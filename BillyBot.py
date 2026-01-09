@@ -1076,11 +1076,11 @@ async def shitpost(ctx:ApplicationContext, src:str, tags:str, description:str):
         await ctx.respond("Illegal file extension")
         return
     sql_insert_blob_query = """INSERT INTO shitposts_tbl
-                          (file_hash, file_extension_id, submitter_id, description, upload_datetime) VALUES (%s,%s,%s,%s,%s);"""
+                          (file_hash, file_extension_id, submitter_id, description) VALUES (%s,%s,%s,%s);"""
     media_contents = media.get_content()
     media_hash = hashlib.sha256(media_contents).hexdigest()
-    upload_datetime = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    insert_blob_tuple = (media_hash, legal_file_extensions[media_extension], ctx.author.id, description, upload_datetime)
+    #upload_datetime = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    insert_blob_tuple = (media_hash, legal_file_extensions[media_extension], ctx.author.id, description)
     try:
         sql_cursor.execute(sql_insert_blob_query, insert_blob_tuple)
         shitpost_id = sql_cursor.lastrowid
