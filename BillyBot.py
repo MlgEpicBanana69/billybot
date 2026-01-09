@@ -100,12 +100,13 @@ async def on_message(message):
                 keyphrase = message.content.replace(BillyBot.user.mention, '').strip()
                 keyphrase = "".join([c for c in keyphrase if c.isalpha() or c == ' '])
 
-                cyber_response = await cyber_intimidation(message, keyphrase)
-                respond_table = [cyber_response]
-                for val in respond_table:
-                    if val is not None:
-                        await message.channel.send(val)
-                        break
+                cyber_responses = await cyber_intimidation(message, keyphrase)
+                respond_table = [cyber_responses]
+                for response in respond_table:
+                    if response is not None:
+                        for msg in response:
+                            await message.channel.send(msg)
+                    break
 
 @BillyBot.event
 async def on_command_error(ctx:ApplicationContext, error):
@@ -342,7 +343,10 @@ async def play(ctx:ApplicationContext, source:str=None, shitpost_id:int=None, sp
     # 1) A link is requested, depending on where that link leads, fetch the audio file and play it
     # 2) A query is requested, search that query on youtube and recommand multiple best results
     """
-    await ctx.defer()
+    try:
+        await ctx.defer()
+    except discord.errors.InteractionResponded:
+        pass # Happens when play is called internally like with sp_pull
     if ctx.author.voice is not None:
         #if ctx.author.voice.channel not in [voice_client.channel for voice_client in ctx.bot.voice_clients]:
         await bot_join(ctx)
@@ -865,9 +869,9 @@ async def sp_delete_tag(ctx:ApplicationContext, tag:str):
     await ctx.respond(f"Deleted tag *{tag}*")
 
 @BillyBot.slash_command(name="sp_pull")
-async def sp_pull(ctx:ApplicationContext, shitpost_id:int=None, keyphrase:str=None, tags:str=None,
+async def sp_pull(ctx:ApplicationContext, keyphrase:str=None, tags:str=None,
         minimum_rating:int=0, maximum_rating:int=100, allow_unrated:bool=True,
-        choose_limit:int=1, choose_random:bool=False, get_details:bool=False):
+        choose_limit:int=1, choose_random:bool=False, get_details:bool=False, shitpost_id:int=None, play:bool=False):
     """
     Pulls one or more shitposts based on matching tags or description and sends it in ctx
 
@@ -875,8 +879,6 @@ async def sp_pull(ctx:ApplicationContext, shitpost_id:int=None, keyphrase:str=No
     ----------
     ctx : `ApplicationContext`
         Discord context
-    shitpost_id : `int`
-        Filter shitposts by id. Can only match one or more shitposts.
     keyphrase : `str`
         Filter shitposts by a keyphrase. This argument is used to match shitposts
         off their description value.
@@ -899,6 +901,11 @@ async def sp_pull(ctx:ApplicationContext, shitpost_id:int=None, keyphrase:str=No
     get_details : `bool`
         Option to only get the metadata of the shitpost rather than the media file itself.
         When set to `True`, this function will not send the media file of matched shitpost/s
+    shitpost_id : `int`
+        Filter shitposts by id. Can only match one or more shitposts.
+    play : `bool`
+        Option to immediately play the pulled shitpost in Voice Chat.
+        When set to `True`, this function explicitly overrides `choose_limit` to `0`
     """
 
     await ctx.defer(ephemeral=True)
@@ -906,6 +913,9 @@ async def sp_pull(ctx:ApplicationContext, shitpost_id:int=None, keyphrase:str=No
     if not sufficient_privileges[0] and sufficient_privileges[1]:
         await ctx.send_followup("Insufficient privileges", ephemeral=True, delete_after=10)
         return
+
+    if play:
+        choose_limit = 0
 
     if shitpost_id is None:
         sql_cursor.execute("SELECT id, description FROM shitposts_tbl;")
@@ -999,7 +1009,10 @@ async def sp_pull(ctx:ApplicationContext, shitpost_id:int=None, keyphrase:str=No
             await ctx.send_followup(output_message[:2000-8] + "\n**...**", ephemeral=True)
         else:
             for shitpost in list(output)[:choose_limit:]:
-                await sp_pull_by_id(ctx, shitpost, get_details=get_details)
+                if play:
+                    await globals()["play"](ctx=ctx, shitpost_id=shitpost)
+                else:
+                    await sp_pull_by_id(ctx, shitpost, get_details=get_details)
             if not get_details:
                 await ctx.send_followup("Shitpost pulled succesfully.", ephemeral=True)
     else:
@@ -1131,18 +1144,19 @@ async def cyber_intimidation(message, keyphrase):
     insults = None
     with open("resources/static/billy_insults.txt", mode="r", encoding='utf-8') as f:
         insults = f.read().split('\n')
-    with open("resources/static/cyber_intimidation.txt", mode="r") as f:
-        cyber_msg = f.read()
-    rip_bozo_gif_url = "https://tenor.com/view/rip-bozo-gif-w22294771"
-    output_msg = f"{message.author.mention} this you?\n\n{cyber_msg}\n{repr(message)}\n\n{rip_bozo_gif_url}"
 
     for insult in insults:
         if insult in keyphrase:
             try:
                 await message.author.timeout(until = discord.utils.utcnow() + datetime.timedelta(seconds=20), reason="RIP BOZO")
             except discord.errors.Forbidden:
-                pass # We don't have permission to ban the caller
-            return output_msg
+                pass # We don't have permission to timeout the caller
+
+            with open("resources/static/cyber_intimidation.txt", mode="r") as f:
+                cyber_msg = f.read()
+            rip_bozo_gif_url = "https://tenor.com/bFH3f.gif"
+            output_messages = (f"{message.author.mention} this you?\n\n{cyber_msg}\n{repr(message)}", f"{rip_bozo_gif_url}")
+            return output_messages
     else:
         return None
 # endregion
