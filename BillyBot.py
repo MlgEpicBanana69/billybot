@@ -3,6 +3,7 @@ import hashlib
 import io
 import os
 import random
+import nmap
 from concurrent.futures import ThreadPoolExecutor
 
 import cv2
@@ -67,6 +68,7 @@ discord_token = os.environ.get("discord_token")
 osu_token = os.environ.get("osu_token")
 sql_usr = os.environ.get("sql_usr")
 sql_pw = os.environ.get("sql_pw")
+minecraft_server = os.environ.get("minecraft_server")
 bb_osu = BillyBot_osu(osu_token)
 
 # Connect to the shitposting database
@@ -131,6 +133,24 @@ async def on_guild_remove(guild):
 async def ping(ctx:ApplicationContext):
     """Checks that the bot is online"""
     await ctx.respond("pong! :ping_pong:")
+
+@BillyBot.slash_command(name="serverstatus")
+async def serverstatus(ctx:ApplicationContext):
+    """
+    Checks if a server is running, configurable in .env
+
+    Example: when configured with an IP and Port of a minecraft server, it responds if that port is open
+    """
+    await ctx.defer()
+    ip, port = minecraft_server.split(':')
+    scanner = nmap.PortScanner()
+    scan = scanner.scan(ip, arguments=f"-np {port}")
+
+    status = scan['scan'][ip]['tcp'][int(port)]['state']
+    if (status == "open"):
+        await ctx.respond(f"{ctx.author.mention} Server is currently running!")
+    else:
+        await ctx.respond(f"{ctx.author.mention} Server is currently closed.")
 
 @BillyBot.slash_command(name="say")
 async def say(ctx:ApplicationContext, message):

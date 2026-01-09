@@ -7,3 +7,9 @@ A general purpose discord bot that does whatever the fuck I tell it to do.
 `music player`: Can play music from a veriety of media sources. Even sped up.\
 `private shitposting database`: it's kinda like a subreddit except I control it [:tf:](https://knowyourmeme.com/memes/trollface)
 > no i don't know if this is against tos
+
+## Requirements
+
+Python 3.10.X
+Installing requirements.txt (preferebly to a virtual enviornment)
+Installing nmap and adding it to PATH (prerequisite for python-nmap)

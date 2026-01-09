@@ -9,6 +9,7 @@ certifi==2025.8.3
 cffi==1.17.1
 charset-normalizer==3.4.3
 dotenv==0.9.9
+ffmpeg
 frozenlist==1.7.0
 idna==3.10
 lz4==4.4.4
@@ -20,10 +21,12 @@ nest-asyncio==1.6.0
 numpy==2.2.6
 opencv-python==4.12.0.88
 propcache==0.3.2
+py-cord @ git+https://github.com/Pycord-Development/pycord@2074aeaf64224ccdcf3876c2dba68f354a6902d8
 pycparser==2.22
 pycryptodomex==3.23.0
 PyNaCl==1.5.0
 python-dotenv==1.1.1
+python-nmap==0.7.1
 pywin32==311
 requests==2.32.4
 shadowcopy==0.0.4
@@ -32,6 +35,4 @@ typing_extensions==4.14.1
 urllib3==2.5.0
 WMI==1.5.1
 yarl==1.20.1
-ffmpeg
 yt-dlp
-py-cord @ git+https://github.com/Pycord-Development/pycord@2074aeaf64224ccdcf3876c2dba68f354a6902d8
