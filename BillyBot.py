@@ -371,7 +371,7 @@ async def play(ctx:ApplicationContext, source:str=None, shitpost_id:int=None, sp
                         placeholder = "Choose a result",
                         min_values = 1,
                         max_values = 1,
-                        options = [discord.SelectOption(label=result[1], value=str(i), default=i==0) for i, result in enumerate(results)]
+                        options = [discord.SelectOption(label=result[1][:100], value=str(i), default=i==0) for i, result in enumerate(results)]
                     )
                     async def select_callback(self, select, interaction:discord.interactions.Interaction): # the function called when the user is done selecting options
                         index = int(select.values[0])
@@ -1006,7 +1006,10 @@ async def sp_pull(ctx:ApplicationContext, keyphrase:str=None, tags:str=None,
                     output_message.append((sp_id, f"id {sp_id}: {sp_desc}"))
             output_message = sorted(output_message, key=lambda x: x[0])
             output_message = "\n".join([part for _, part in output_message])
-            await ctx.send_followup(output_message[:2000-8] + "\n**...**", ephemeral=True)
+            if len(output_message) >= 2000-8:
+                output_message = output_message[:2000-8] + "\n**...**"
+
+            await ctx.send_followup(output_message, ephemeral=True)
         else:
             for shitpost in list(output)[:choose_limit:]:
                 if play:
